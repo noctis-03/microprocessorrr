@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마프 프로젝트 대화 기록</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+            background-color: #1a1a2e;
+            color: #e0e0e0;
+            line-height: 1.7;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #16213e, #0f3460);
+            border-radius: 16px;
+            border: 1px solid #0f3460;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            color: #4fc3f7;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #90a4ae;
+            font-size: 0.9em;
+        }
+
+        .chat-section {
+            margin-bottom: 40px;
+        }
+
+        .section-divider {
+            text-align: center;
+            margin: 40px 0 30px;
+            padding: 10px;
+            color: #4fc3f7;
+            font-size: 0.85em;
+            border-top: 1px solid #2a2a4a;
+            padding-top: 20px;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .message.user .avatar {
+            background: #4fc3f7;
+            color: #1a1a2e;
+        }
+
+        .message.assistant .avatar {
+            background: #7c4dff;
+            color: white;
+        }
+
+        .bubble {
+            max-width: 78%;
+            padding: 16px 20px;
+            border-radius: 16px;
+            font-size: 0.92em;
+        }
+
+        .message.user .bubble {
+            background: #1e3a5f;
+            border: 1px solid #2a5a8f;
+            border-top-right-radius: 4px;
+        }
+
+        .message.assistant .bubble {
+            background: #2a2a4a;
+            border: 1px solid #3a3a5a;
+            border-top-left-radius: 4px;
+        }
+
+        .bubble h1 {
+            font-size: 1.3em;
+            color: #4fc3f7;
+            margin: 16px 0 10px;
+            border-bottom: 1px solid #3a3a5a;
+            padding-bottom: 6px;
+        }
+
+        .bubble h1:first-child {
+            margin-top: 0;
+        }
+
+        .bubble h2 {
+            font-size: 1.1em;
+            color: #81d4fa;
+            margin: 14px 0 8px;
+        }
+
+        .bubble h3 {
+            font-size: 1em;
+            color: #b3e5fc;
+            margin: 12px 0 6px;
+        }
+
+        .bubble p {
+            margin-bottom: 10px;
+        }
+
+        .bubble ul, .bubble ol {
+            margin: 8px 0 8px 20px;
+        }
+
+        .bubble li {
+            margin-bottom: 4px;
+        }
+
+        .bubble table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 0.85em;
+        }
+
+        .bubble th, .bubble td {
+            border: 1px solid #3a3a5a;
+            padding: 8px 10px;
+            text-align: left;
+        }
+
+        .bubble th {
+            background: #1a1a3e;
+            color: #4fc3f7;
+        }
+
+        .bubble code {
+            background: #1a1a3e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.88em;
+            color: #80cbc4;
+        }
+
+        .bubble pre {
+            background: #0d0d1a;
+            padding: 14px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 10px 0;
+            border: 1px solid #2a2a4a;
+        }
+
+        .bubble pre code {
+            background: none;
+            padding: 0;
+            color: #a5d6a7;
+            font-size: 0.82em;
+            line-height: 1.5;
+        }
+
+        .bubble .highlight-green { color: #4caf50; }
+        .bubble .highlight-yellow { color: #ffd54f; }
+        .bubble .highlight-red { color: #ef5350; }
+
+        .toc {
+            background: #16213e;
+            border: 1px solid #0f3460;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .toc h2 {
+            color: #4fc3f7;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .toc li {
+            padding: 4px 0;
+        }
+
+        .toc a {
+            color: #81d4fa;
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            color: #4fc3f7;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .bubble {
+                max-width: 90%;
+            }
+
+            .header h1 {
+                font-size: 1.4em;
+            }
+
+            body {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ DualCore Station 프로젝트</h1>
+            <p>ESP32 듀얼 보드 스마트 디스플레이 시스템 - 전체 대화 기록</p>
+            <p style="margin-top: 8px; color: #607d8b;">날짜: 2026-05-11</p>
+        </div>
+
+        <div class="toc">
+            <h2>📑 목차</h2>
+            <ul>
+                <li><a href="#conv1">1. 프로젝트 구현 가능성 분석</a></li>
+                <li><a href="#conv2">2. 인터넷 라디오 → BT 스피커 재생</a></li>
+                <li><a href="#conv3">3. Spotify 재생 정보 화면 표시</a></li>
+                <li><a href="#conv4">4. A 보드 화면 처리 방법</a></li>
+                <li><a href="#conv5">5. Deep Sleep 중 B의 화면 갱신 요청</a></li>
+                <li><a href="#conv6">6. ESP32-S3 전력 모드 총정리</a></li>
+                <li><a href="#conv7">7. 유선/무선 절전 모드 조합 설계</a></li>
+                <li><a href="#conv8">8. 프로젝트 구체화 (기획서)</a></li>
+            </ul>
+        </div>
+
+        <!-- ==================== 대화 1 ==================== -->
+        <div class="section-divider" id="conv1">── 대화 1: 프로젝트 구현 가능성 분석 ──</div>
+
+        <div class="chat-section">
+            <div class="message user">
+                <div class="avatar">U</div>
+                <div class="bubble">
+                    <p>CrowPanel ESP32 4.2inch E-paper HMI Display 개발보드를 A<br>외부 ESP32 보드를 B라 하면</p>
+                    <p>A는 디스플레이에 표시할 정보를 요청하거나 받는 용도<br>
+                    때로는 내장 물리버튼을 사용하여 정보를 보내는 용도<br>
+                    A와 B 모두 ESP32 탑재이기에 무선으로 통신<br>
+                    A 기본모드는 캘린더 모드 / 현재 날짜를 표시한다<br>
+                    하루에 한번 00시에 새로고침<br>
+                    A는 배터리 효율이 매우 좋아야 함</p>
+                    <p>B는 온도, 빛, 사람 움직임을 인식하여 정보 처리를 하는 용도<br>
+                    또한 A 디스플레이에 정보 표시 요청<br>
+                    와이파이를 사용하여 핸드폰 연동 및 핸드폰에서 명령<br>
+                    블루투스를 사용하여 블루투스 스피커와 연동<br>
+                    spotify api로 음악 재생<br>
+                    날씨 api로 날씨 불러오기<br>
+                    open ai api 연동을 통한 현재 이슈 간단히 요약하여 불러오기<br>
+                    B는 4개의 버튼이 연결되어 있음</p>
+                    <p>구현 가능?</p>
+                </div>
+            </div>
+
+            <div class="message assistant">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <h1>CrowPanel ESP32 4.2" E-Paper (A) + 외부 ESP32 (B) 시스템 분석</h1>
+                    <h2>결론부터: 대부분 구현 가능하지만, 일부 제약사항이 있습니다.</h2>
+
+                    <h2>A 보드 (CrowPanel ESP32 4.2" E-Paper) 확인된 스펙</h2>
+                    <table>
+                        <tr><th>항목</th><th>내용</th></tr>
+                        <tr><td>MCU</td><td>ESP32-S3-WROOM-1-N8R8 (240MHz)</td></tr>
+                        <tr><td>Flash / PSRAM</td><td>8MB / 8MB</td></tr>
+                        <tr><td>디스플레이</td><td>400×300, 흑백, SSD1683 드라이버</td></tr>
+                        <tr><td>무선</td><td>WiFi + Bluetooth (ESP32-S3 내장)</td></tr>
+                        <tr><td>버튼</td><td>다이얼 스위치×1, 메뉴 버튼×1, 백 버튼×1, RESET×1, BOOT×1</td></tr>
+                        <tr><td>인터페이스</td><td>UART0, BAT(SH1.0-2P), GPIO 2×10핀, TF카드 슬롯</td></tr>
+                        <tr><td>특징</td><td>전원 차단 후에도 화면 유지, 부분 새로고침 지원</td></tr>
+                    </table>
+
+                    <h2>✅ 완전히 구현 가능한 것들</h2>
+                    <p><strong>A 측:</strong></p>
+                    <ul>
+                        <li><strong>캘린더 모드 (기본)</strong> — E-Paper는 전원 없이도 화면 유지. RTC 또는 NTP로 날짜 동기화 후 표시하면 됨</li>
+                        <li><strong>하루 1회 새로고침 (00시)</strong> — Deep Sleep + Timer Wake-up으로 24시간마다 기상 → 화면 갱신 → 재수면</li>
+                        <li><strong>배터리 효율</strong> — ESP32-S3 Deep Sleep 시 약 10~25µA. E-Paper는 갱신 시에만 전력 소모. 1500mAh 배터리 기준 수개월~1년 운용 가능</li>
+                        <li><strong>물리 버튼으로 정보 전송</strong> — 버튼 인터럽트로 Deep Sleep에서 깨어나 B에 메시지 전송 가능</li>
+                        <li><strong>A↔B 무선 통신</strong> — ESP-NOW 프로토콜 사용 시 WiFi AP 연결 없이 초저전력 P2P 통신 가능</li>
+                    </ul>
+
+                    <p><strong>B 측:</strong></p>
+                    <ul>
+                        <li><strong>온도/빛/PIR 센서</strong> — 일반 GPIO + ADC로 연결, 매우 표준적인 구현</li>
+                        <li><strong>4개 버튼</strong> — GPIO 인터럽트로 처리</li>
+                        <li><strong>WiFi로 핸드폰 연동</strong> — ESP32 WebServer 또는 MQTT 등으로 구현 가능</li>
+                        <li><strong>날씨 API</strong> — WiFi HTTP 요청으로 OpenWeatherMap 등 호출</li>
+                        <li><strong>OpenAI API 연동</strong> — HTTPS 요청으로 API 호출 가능 (ESP32-S3는 TLS 지원)</li>
+                        <li><strong>A에 정보 표시 요청</strong> — ESP-NOW 또는 WiFi로 B→A 데이터 전송, A가 화면 갱신</li>
+                    </ul>
+
+                    <h2>⚠️ 구현 가능하지만 제약사항이 있는 것들</h2>
+
+                    <h3>1. Spotify API로 음악 재생</h3>
+                    <table>
+                        <tr><th>방식</th><th>설명</th></tr>
+                        <tr><td>컨트롤러 방식 (권장)</td><td>ESP32가 Spotify Web API를 통해 재생/일시정지/스킵 명령만 전송. 실제 음악은 핸드폰이나 다른 Spotify Connect 디바이스에서 재생됨. <strong>Spotify Premium 필수</strong></td></tr>
+                        <tr><td>직접 스트리밍 (매우 어려움)</td><td>ESP32가 직접 음악 데이터를 수신하여 블루투스 스피커로 전송하는 것은 Spotify DRM과 대역폭 문제로 <strong>사실상 불가능</strong></td></tr>
+                    </table>
+                    <p>→ <strong>결론: "리모컨" 역할은 완벽히 가능, 직접 스트리밍은 불가</strong></p>
+
+                    <h3>2. Bluetooth 스피커 연동</h3>
+                    <table>
+                        <tr><th>시나리오</th><th>가능성</th></tr>
+                        <tr><td>ESP32에서 직접 오디오 생성 → BT 스피커로 전송</td><td>✅ 가능 (A2DP Source)</td></tr>
+                        <tr><td>ESP32가 WiFi로 받은 오디오 → BT 스피커 전송</td><td>⚠️ 가능하나 WiFi + BT 동시 사용 시 대역폭 경합</td></tr>
+                        <tr><td>Spotify 스트림을 중계</td><td>❌ DRM 제약으로 불가</td></tr>
+                    </table>
+                    <p>→ <strong>TTS 알림음, 로컬 MP3 재생, 알람 소리 등은 가능. Spotify 음악 중계는 불가</strong></p>
+
+                    <h3>3. WiFi + Bluetooth 동시 사용 (B 보드)</h3>
+                    <p>ESP32는 WiFi와 Bluetooth가 동일한 2.4GHz 라디오를 공유합니다. 동시 사용은 가능하지만 시분할(time-sharing)로 작동하므로 성능 저하가 있을 수 있습니다.</p>
+
+                    <h2>🏗️ 권장 아키텍처</h2>
+                    <pre><code>┌─────────────────────────────────────────────────┐
+│  A: CrowPanel ESP32 4.2" E-Paper                │
+│  [Deep Sleep 99.9% 시간]                         │
+│     ↓ Timer (24h) 또는 버튼 인터럽트              │
+│  [Wake] → ESP-NOW로 B에 요청/수신 → 화면 갱신     │
+│     ↓                                            │
+│  [Deep Sleep 복귀]                               │
+└─────────────────────────────────────────────────┘
+         ▲ ESP-NOW (저전력 P2P) ▼
+┌─────────────────────────────────────────────────┐
+│  B: 외부 ESP32 (항시 전원)                        │
+│  • 센서: 온도, 빛, PIR                           │
+│  • WiFi: 핸드폰 앱 연동, API 호출                 │
+│  • Bluetooth: A2DP Source → BT 스피커             │
+│  • 4개 버튼: 기능 전환/제어                       │
+│  • A에 표시할 데이터 준비 & 전송                   │
+└─────────────────────────────────────────────────┘
+         ▲ WiFi ▼
+┌──────────────────┐
+│  핸드폰 (앱)      │
+└──────────────────┘</code></pre>
+
+                    <h2>최종 결론</h2>
+                    <table>
+                        <tr><th>기능</th><th>판정</th></tr>
+                        <tr><td>A 캘린더 + 하루 1회 갱신</td><td class="highlight-green">✅ 완벽</td></tr>
+                        <tr><td>A 초저전력 운용</td><td class="highlight-green">✅ 완벽</td></tr>
+                        <tr><td>A 버튼으로 B에 신호 전송</td><td class="highlight-green">✅ 완벽</td></tr>
+                        <tr><td>A↔B ESP-NOW 통신</td><td class="highlight-green">✅ 완벽</td></tr>
+                        <tr><td>B 센서 (온도/빛/PIR)</td><td class="highlight-green">✅ 완벽</td></tr>
+                        <tr><td>B 핸드폰 WiFi 연동</td><td class="highlight-green">✅ 완벽</td></tr>
+                        <tr><td>B 날씨 API</td><td class="highlight-green">✅ 완벽</td></tr>
+                        <tr><td>B OpenAI API</td><td class="highlight-green">✅ 완벽</td></tr>
+                        <tr><td>B Spotify 재생 제어 (리모컨)</td><td class="highlight-green">✅ Premium 필요</td></tr>
+                        <tr><td>B Spotify 직접 스트리밍</td><td class="highlight-red">❌ 불가</td></tr>
+                        <tr><td>B → BT 스피커 (알림/로컬 오디오)</td><td class="highlight-green">✅ 가능</td></tr>
+                        <tr><td>B → BT 스피커 (Spotify 음악 중계)</td><td class="highlight-red">❌ 불가</td></tr>
+                    </table>
+                    <p><strong>전체적으로 90% 이상 구현 가능한 프로젝트입니다.</strong> Spotify 부분만 "직접 스트리밍" 대신 "리모컨 + 핸드폰/PC에서 재생" 방식으로 설계하면 모든 기능이 현실적으로 구현됩니다.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 대화 2 ==================== -->
+        <div class="section-divider" id="conv2">── 대화 2: 인터넷 라디오 → BT 스피커 재생 ──</div>
+
+        <div class="chat-section">
+            <div class="message user">
+                <div class="avatar">U</div>
+                <div class="bubble">
+                    <p>그러면 라디오를 블루투스 스피커로 재생은?</p>
+                </div>
+            </div>
+
+            <div class="message assistant">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <h1>인터넷 라디오 → 블루투스 스피커 재생</h1>
+                    <h2>결론: B 보드의 ESP32 칩 종류에 따라 다릅니다</h2>
+
+                    <h3>핵심 문제: ESP32-S3는 A2DP(Bluetooth Classic Audio)를 지원하지 않음</h3>
+                    <table>
+                        <tr><th>ESP32 칩 종류</th><th>Bluetooth Classic (A2DP)</th><th>BLE</th><th>인터넷 라디오 → BT 스피커</th></tr>
+                        <tr><td><strong>ESP32 (오리지널)</strong></td><td>✅ 지원</td><td>✅</td><td class="highlight-green">✅ 가능</td></tr>
+                        <tr><td><strong>ESP32-S3</strong></td><td>❌ 미지원</td><td>✅ BLE 5.0</td><td class="highlight-red">❌ 불가</td></tr>
+                        <tr><td><strong>ESP32-C3/C6</strong></td><td>❌ 미지원</td><td>✅</td><td class="highlight-red">❌ 불가</td></tr>
+                    </table>
+
+                    <p>블루투스 스피커에 오디오를 보내려면 <strong>A2DP Source</strong> (Bluetooth Classic)가 필수인데, ESP32-S3 계열은 BLE만 탑재되어 있어 블루투스 스피커로 오디오 전송이 원천적으로 불가능합니다.</p>
+
+                    <h2>✅ B를 오리지널 ESP32 (WROVER 등)로 사용하면 완벽히 가능</h2>
+                    <p>오리지널 ESP32는 WiFi + Bluetooth Classic + BLE를 모두 지원합니다.</p>
+                    <pre><code>[인터넷 라디오 스트림 (MP3/AAC)]
+        ↓ WiFi HTTP
+[ESP32 (오리지널) - MP3 디코딩]
+        ↓ A2DP Source
+[블루투스 스피커 재생]</code></pre>
+
+                    <p>검증된 프레임워크:</p>
+                    <ul>
+                        <li><strong>ESP-ADF (Espressif Audio Development Framework)</strong> — pipeline_http_mp3 + pipeline_bt_source 예제 조합</li>
+                        <li><strong>ESP32-A2DP 라이브러리</strong> (pschatzmann) — Arduino 환경에서 A2DP Source 구현</li>
+                        <li><strong>PSRAM 4MB 이상 권장</strong> — MP3 디코딩 + WiFi + BT 동시 운용에 메모리 필요</li>
+                    </ul>
+
+                    <h2>권장 사항</h2>
+                    <table>
+                        <tr><th>구성</th><th>선택</th></tr>
+                        <tr><td>A 보드</td><td>CrowPanel ESP32 4.2" E-Paper (ESP32-S3) — 그대로 사용</td></tr>
+                        <tr><td>B 보드</td><td><strong>오리지널 ESP32-WROVER</strong> (4MB PSRAM 이상) 사용 권장</td></tr>
+                    </table>
+
+                    <p>B를 오리지널 ESP32로 선택하면:</p>
+                    <ul>
+                        <li>✅ 인터넷 라디오 WiFi 수신 → MP3 디코딩 → A2DP로 BT 스피커 전송</li>
+                        <li>✅ Spotify 제어 (Web API 리모컨)</li>
+                        <li>✅ WiFi API 호출 (날씨, OpenAI)</li>
+                        <li>✅ ESP-NOW로 A와 통신</li>
+                        <li>✅ 센서 + 버튼 모두 처리 가능</li>
+                    </ul>
+
+                    <h2>요약</h2>
+                    <table>
+                        <tr><th>질문</th><th>답</th></tr>
+                        <tr><td>인터넷 라디오 → BT 스피커 가능?</td><td><strong>오리지널 ESP32 사용 시 ✅ 가능</strong></td></tr>
+                        <tr><td>ESP32-S3로 가능?</td><td>❌ A2DP 미지원으로 불가</td></tr>
+                        <tr><td>필요 조건</td><td>ESP32 (Classic BT 지원) + PSRAM 4MB+</td></tr>
+                        <tr><td>검증된 방법</td><td>ESP-ADF 또는 ESP32-A2DP 라이브러리</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 대화 3 ==================== -->
+        <div class="section-divider" id="conv3">── 대화 3: Spotify 재생 정보 화면 표시 ──</div>
+
+        <div class="chat-section">
+            <div class="message user">
+                <div class="avatar">U</div>
+                <div class="bubble">
+                    <p>스포티파이 api로 재생중인 음악을 불러와서 화면에 표시하는 건 됨?</p>
+                </div>
+            </div>
+
+            <div class="message assistant">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <h1>✅ 완벽히 가능합니다</h1>
+                    <p>Spotify Web API의 <strong>"Get Currently Playing Track"</strong> 엔드포인트를 사용하면 됩니다.</p>
+
+                    <h2>가져올 수 있는 정보</h2>
+                    <ul>
+                        <li>곡 제목 (track name)</li>
+                        <li>아티스트 이름</li>
+                        <li>앨범 이름</li>
+                        <li>앨범 커버 아트 URL (이미지)</li>
+                        <li>재생 진행률 (progress_ms / duration_ms)</li>
+                        <li>재생/일시정지 상태</li>
+                        <li>셔플, 반복 상태</li>
+                    </ul>
+
+                    <h2>E-Paper에 표시할 때 고려사항</h2>
+                    <table>
+                        <tr><th>항목</th><th>설명</th></tr>
+                        <tr><td>텍스트 (곡명/아티스트)</td><td>✅ 문제없음. 한글 폰트만 포함시키면 됨</td></tr>
+                        <tr><td>앨범 아트</td><td>⚠️ 제약 있음 (흑백 디더링 변환 필요)</td></tr>
+                        <tr><td>새로고침 빈도</td><td>⚠️ E-Paper 특성상 고려 필요</td></tr>
+                    </table>
+
+                    <p><strong>앨범 아트:</strong> E-Paper가 흑백 400×300이므로, 컬러 앨범 이미지를 흑백 디더링으로 변환해야 합니다. B에서 이미지를 다운로드 → 리사이즈 → 흑백 변환 → A로 전송하는 방식으로 처리합니다.</p>
+
+                    <p><strong>새로고침 빈도:</strong> 곡이 바뀔 때마다 E-Paper를 갱신하면 배터리 소모가 증가합니다. 음악 모드일 때만 활성화하고 캘린더 모드로 복귀하면 다시 Deep Sleep에 들어가는 식으로 분리 설계하면 됩니다.</p>
+
+                    <h2>동작 흐름</h2>
+                    <pre><code>[핸드폰에서 Spotify 재생 중]
+        ↓
+[B: ESP32] → Spotify API 호출 (GET /v1/me/player/currently-playing)
+        ↓ JSON 파싱 (곡명, 아티스트, 앨범아트 URL)
+        ↓ 앨범아트 다운로드 → 흑백 변환 → 비트맵 생성
+        ↓ ESP-NOW
+[A: E-Paper] → 화면에 표시</code></pre>
+
+                    <h2>필요 조건</h2>
+                    <ul>
+                        <li><strong>Spotify Premium 계정</strong> (무료 계정은 이 엔드포인트 접근 제한)</li>
+                        <li><strong>OAuth 2.0 인증</strong> (refresh token 방식으로 ESP32에서 자동 갱신 가능)</li>
+                        <li>A를 "음악 모드"로 전환하는 트리거 (B의 버튼 또는 자동 감지)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 대화 4 ==================== -->
+        <div class="section-divider" id="conv4">── 대화 4: A 보드 화면 처리 방법 ──</div>
+
+        <div class="chat-section">
+            <div class="message user">
+                <div class="avatar">U</div>
+                <div class="bubble">
+                    <p>a 에서 화면을 처리하는 방법은?</p>
+                </div>
+            </div>
+
+            <div class="message assistant">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <h1>A (CrowPanel ESP32 4.2" E-Paper)에서 화면 처리 방법</h1>
+
+                    <h2>1. GxEPD2 라이브러리 (권장)</h2>
+                    <p>가장 범용적이고 강력한 방법입니다. Adafruit GFX 기반이라 그래픽 함수가 풍부합니다.</p>
+                    <pre><code>#include "GxEPD2_BW.h"
+
+#define PWR 7
+#define BUSY 48
+#define RES 47
+#define DC 46
+#define CS 45
+
+GxEPD2_BW&lt;GxEPD2_420_GYE042A87, GxEPD2_420_GYE042A87::HEIGHT&gt; 
+  epd(GxEPD2_420_GYE042A87(CS, DC, RES, BUSY));
+
+void epdPower(int state) { 
+  pinMode(PWR, OUTPUT);  
+  digitalWrite(PWR, state);  // CrowPanel 전용 - 전원 ON/OFF
+}</code></pre>
+                    <p><strong>핵심 포인트:</strong> CrowPanel은 GPIO7로 디스플레이 전원을 제어합니다. <code>epdPower(HIGH)</code>로 켜고, 갱신 후 <code>epdPower(LOW)</code>로 꺼도 화면은 그대로 유지됩니다.</p>
+
+                    <h3>그릴 수 있는 것들</h3>
+                    <table>
+                        <tr><th>기능</th><th>함수</th></tr>
+                        <tr><td>텍스트</td><td><code>epd.setCursor(x,y)</code> + <code>epd.print("텍스트")</code></td></tr>
+                        <tr><td>도형</td><td><code>fillRect</code>, <code>drawCircle</code>, <code>drawLine</code> 등</td></tr>
+                        <tr><td>비트맵 이미지</td><td><code>epd.drawBitmap(x, y, bitmap, w, h, color)</code></td></tr>
+                        <tr><td>커스텀 폰트</td><td><code>epd.setFont(&FreeMonoBold24pt7b)</code></td></tr>
+                        <tr><td>부분 새로고침</td><td><code>epd.setPartialWindow(x, y, w, h)</code></td></tr>
+                    </table>
+
+                    <h2>2. 화면 모드별 설계</h2>
+                    <pre><code>enum ScreenMode {
+  MODE_CALENDAR,
+  MODE_MUSIC,
+  MODE_WEATHER,
+  MODE_NEWS
+};
+
+void drawCalendar() {
+  epd.setFullWindow();
+  epd.fillScreen(GxEPD_WHITE);
+  epd.setFont(&FreeMonoBold24pt7b);
+  epd.setCursor(100, 80);
+  epd.print("2026");
+  epd.setCursor(60, 160);
+  epd.print("May 11  Sun");
+  epd.drawLine(20, 200, 380, 200, GxEPD_BLACK);
+  epd.display();
+}
+
+void drawMusicInfo(String title, String artist) {
+  epd.setFullWindow();
+  epd.fillScreen(GxEPD_WHITE);
+  epd.drawBitmap(20, 20, music_icon, 48, 48, GxEPD_BLACK);
+  epd.setCursor(20, 100);
+  epd.print(title);
+  epd.setCursor(20, 140);
+  epd.print(artist);
+  epd.drawBitmap(250, 60, albumArt_bw, 120, 120, GxEPD_BLACK);
+  epd.display();
+}</code></pre>
+
+                    <h2>3. 전체 동작 흐름 (Deep Sleep 포함)</h2>
+                    <pre><code>void setup() {
+  esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
+  
+  epdPower(HIGH);
+  epdInit();
+  
+  switch (wakeup) {
+    case ESP_SLEEP_WAKEUP_TIMER:
+      syncTimeFromB();
+      drawCalendar();
+      break;
+    case ESP_SLEEP_WAKEUP_EXT0:
+      requestDataFromB();
+      drawBasedOnMode();
+      break;
+    default:
+      drawCalendar();
+      break;
+  }
+  
+  epd.hibernate();
+  epdPower(LOW);
+  
+  esp_sleep_enable_timer_wakeup(timeUntilMidnight());
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, LOW);
+  esp_deep_sleep_start();
+}</code></pre>
+
+                    <h2>4. B에서 데이터 받아서 화면 갱신</h2>
+                    <pre><code>typedef struct {
+  uint8_t mode;
+  char title[64];
+  char artist[64];
+  uint8_t image[1800]; // 120x120 흑백 비트맵
+} DisplayPayload;
+
+void onDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
+  DisplayPayload *payload = (DisplayPayload *)data;
+  epdPower(HIGH);
+  epdInit();
+  switch (payload-&gt;mode) {
+    case MODE_MUSIC:
+      drawMusicInfo(payload-&gt;title, payload-&gt;artist);
+      break;
+    case MODE_WEATHER:
+      drawWeather(payload-&gt;title);
+      break;
+  }
+  epd.hibernate();
+  epdPower(LOW);
+}</code></pre>
+
+                    <h2>5. 한글 표시 방법</h2>
+                    <table>
+                        <tr><th>방법</th><th>설명</th></tr>
+                        <tr><td>u8g2_for_Adafruit_GFX</td><td>u8g2 한글 폰트를 GxEPD2에 연결. 가장 쉬움</td></tr>
+                        <tr><td>커스텀 비트맵 폰트</td><td>필요한 글자만 비트맵으로 변환하여 포함</td></tr>
+                        <tr><td>B에서 이미지로 렌더링</td><td>B가 텍스트를 비트맵으로 변환 후 A에 전송 (가장 유연)</td></tr>
+                    </table>
+
+                    <h2>요약</h2>
+                    <table>
+                        <tr><th>항목</th><th>방법</th></tr>
+                        <tr><td>라이브러리</td><td>GxEPD2 + Adafruit GFX</td></tr>
+                        <tr><td>전원 제어</td><td>GPIO7 HIGH/LOW (CrowPanel 전용)</td></tr>
+                        <tr><td>전체 새로고침</td><td><code>epd.display()</code> — 약 2~4초</td></tr>
+                        <tr><td>부분 새로고침</td><td><code>epd.setPartialWindow()</code> — 약 0.3~0.5초</td></tr>
+                        <tr><td>모드 전환</td><td>Deep Sleep wake-up 원인에 따라 분기</td></tr>
+                        <tr><td>이미지 표시</td><td>흑백 비트맵 배열로 변환 후 drawBitmap()</td></tr>
+                        <tr><td>배터리 절약</td><td>hibernate() → epdPower(LOW) → Deep Sleep</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 대화 5 ==================== -->
+        <div class="section-divider" id="conv5">── 대화 5: Deep Sleep 중 B의 화면 갱신 요청 ──</div>
+
+        <div class="chat-section">
+            <div class="message user">
+                <div class="avatar">U</div>
+                <div class="bubble">
+                    <p>A가 딥슬립 상태일 떄 B가 화면 새로고침을 요청할 수 있어?</p>
+                </div>
+            </div>
+
+            <div class="message assistant">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <h1>직접적으로는 불가능합니다</h1>
+                    <p><strong>Deep Sleep 상태에서는 WiFi/BT 라디오가 완전히 꺼져 있기 때문에, ESP-NOW든 WiFi든 무선 신호로 A를 깨울 수 없습니다.</strong></p>
+                    <p>ESP32의 Deep Sleep wake-up 소스는 딱 4가지뿐입니다: 타이머, GPIO(ext0/ext1), 터치핀, ULP 코프로세서. 무선 수신은 포함되지 않습니다.</p>
+
+                    <h2>해결 방법들</h2>
+
+                    <h3>방법 1: B → A 유선 GPIO 연결 (가장 확실)</h3>
+                    <p>B에서 A의 RTC_GPIO 핀 하나에 물리적으로 선을 연결합니다.</p>
+                    <pre><code>B (GPIO 출력) ───── 선 1개 ───── A (RTC_GPIO 입력, ext0 wake-up)
+
+// A 측: Deep Sleep 진입 전
+esp_sleep_enable_ext0_wakeup(GPIO_NUM_9, HIGH);
+esp_deep_sleep_start();
+
+// B 측: A를 깨우고 싶을 때
+digitalWrite(WAKE_PIN, HIGH);
+delay(10);
+digitalWrite(WAKE_PIN, LOW);</code></pre>
+
+                    <h3>방법 2: 주기적 Light Sleep + 폴링</h3>
+                    <p>A가 짧은 주기(예: 30초~5분)로 깨어나서 ESP-NOW 메시지가 있는지 확인합니다.</p>
+                    <table>
+                        <tr><th>주기</th><th>배터리 영향</th></tr>
+                        <tr><td>5분마다</td><td>거의 무시 가능</td></tr>
+                        <tr><td>30초마다</td><td>약간 증가</td></tr>
+                        <tr><td>5초마다</td><td>상당히 증가 — 배터리 수명 수주로 단축</td></tr>
+                    </table>
+
+                    <h3>방법 3: 하이브리드 (권장)</h3>
+                    <pre><code>// A 측 - 여러 wake-up 소스 동시 설정
+esp_sleep_enable_timer_wakeup(24ULL * 3600 * 1000000);  // 24시간
+esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, LOW);          // 버튼
+esp_sleep_enable_ext1_wakeup(BIT(GPIO_NUM_9), ESP_EXT1_WAKEUP_ANY_HIGH); // B 신호
+esp_deep_sleep_start();</code></pre>
+
+                    <h2>최종 권장: 방법 3 (하이브리드)</h2>
+                    <p>B에서 A로 점퍼 와이어 1개만 연결하면, 무선 통신의 저전력 장점을 유지하면서도 B가 언제든 A를 깨울 수 있습니다.</p>
+                    <table>
+                        <tr><th>동작</th><th>전력 소모</th></tr>
+                        <tr><td>Deep Sleep 대기</td><td>~10µA</td></tr>
+                        <tr><td>B의 GPIO 신호로 깨어남</td><td>0 (대기 중 추가 소모 없음)</td></tr>
+                        <tr><td>깨어나서 ESP-NOW 수신 + 화면 갱신</td><td>~2초간 약 80~150mA</td></tr>
+                        <tr><td>다시 Deep Sleep</td><td>~10µA</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 대화 6 ==================== -->
+        <div class="section-divider" id="conv6">── 대화 6: ESP32-S3 전력 모드 총정리 ──</div>
+
+        <div class="chat-section">
+            <div class="message user">
+                <div class="avatar">U</div>
+                <div class="bubble">
+                    <p>A의 Deep Sleep와 같은 모드들은 뭐가 있어?</p>
+                </div>
+            </div>
+
+            <div class="message assistant">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <h1>ESP32-S3 (A 보드)의 전력 모드 총정리</h1>
+
+                    <h2>전력 모드 비교표</h2>
+                    <table>
+                        <tr><th>모드</th><th>전류 소모</th><th>켜져 있는 것</th><th>꺼져 있는 것</th><th>복귀 시간</th></tr>
+                        <tr><td><strong>Active</strong></td><td>80~240mA</td><td>전부</td><td>-</td><td>-</td></tr>
+                        <tr><td><strong>Modem Sleep</strong></td><td>3~20mA</td><td>CPU, RAM, 주변장치</td><td>WiFi/BT 라디오</td><td>즉시</td></tr>
+                        <tr><td><strong>Light Sleep</strong></td><td>130~800µA</td><td>RTC, RAM(유지), ULP</td><td>CPU(정지), 주변장치, 라디오</td><td>~1ms</td></tr>
+                        <tr><td><strong>Deep Sleep</strong></td><td>7~25µA</td><td>RTC 컨트롤러, RTC 메모리, ULP</td><td>CPU, RAM, 모든 디지털 주변장치</td><td>~수백ms (재부팅)</td></tr>
+                        <tr><td><strong>Hibernation</strong></td><td>~5~7µA</td><td>RTC 타이머만</td><td>RTC 메모리, ULP 포함 거의 전부</td><td>~수백ms (재부팅)</td></tr>
+                    </table>
+
+                    <h2>각 모드 상세</h2>
+
+                    <h3>1. Active Mode (활성)</h3>
+                    <p>일반 동작 상태. WiFi 전송 시 최대 240mA까지 소모합니다.</p>
+
+                    <h3>2. Modem Sleep (모뎀 슬립)</h3>
+                    <p>WiFi/BT 라디오만 끄고 CPU는 계속 동작. A 보드에서는 큰 의미 없음.</p>
+
+                    <h3>3. Light Sleep (라이트 슬립)</h3>
+                    <p>CPU가 정지하지만 RAM 내용이 보존됩니다. 깨어나면 잠든 시점부터 코드가 이어서 실행됩니다.</p>
+                    <p><strong>Wake-up 소스:</strong> 타이머, GPIO (아무 핀 가능), UART 수신, 터치패드, ext0/ext1</p>
+                    <p><strong>장점:</strong> 복귀 빠름(1ms 이내), 프로그램 상태 유지<br>
+                    <strong>단점:</strong> Deep Sleep보다 전류 10~50배 높음</p>
+
+                    <h3>4. Deep Sleep (딥 슬립) ← A 보드의 메인 모드</h3>
+                    <p>CPU와 대부분의 RAM이 완전히 꺼짐. 깨어나면 setup()부터 다시 시작.</p>
+                    <p><strong>Wake-up 소스:</strong> 타이머, ext0, ext1, 터치패드, ULP 코프로세서</p>
+                    <pre><code>RTC_DATA_ATTR int bootCount = 0;  // Deep Sleep 간에도 유지됨</code></pre>
+
+                    <h3>5. Hibernation (하이버네이션) — 최소 전력</h3>
+                    <p>RTC 메모리와 ULP까지 꺼서 전력을 더 줄임.</p>
+                    <p><strong>Wake-up 소스:</strong> 타이머, ext0/ext1만 가능 (ULP, 터치 불가)</p>
+                    <pre><code>esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+esp_deep_sleep_start();</code></pre>
+
+                    <h2>A 보드 프로젝트에 최적인 전략</h2>
+                    <pre><code>┌──────────────────────────────────────────────────┐
+│  평상시: Deep Sleep (~10µA)                       │
+│                                                   │
+│  Wake-up 조건:                                    │
+│   ① 타이머 24h → 날짜 변경, 캘린더 갱신            │
+│   ② ext0/ext1 → B의 GPIO 신호 (화면 갱신 요청)    │
+│   ③ ext0 → 사용자 버튼 (MENU 등)                  │
+└──────────────────────────────────────────────────┘</code></pre>
+
+                    <h2>실제 배터리 수명 추정 (1500mAh 기준)</h2>
+                    <table>
+                        <tr><th>사용 패턴</th><th>예상 수명</th></tr>
+                        <tr><td>Deep Sleep + 하루 1회 갱신</td><td>약 1.5~2년</td></tr>
+                        <tr><td>Deep Sleep + 5분마다 폴링</td><td>약 3~6개월</td></tr>
+                        <tr><td>Light Sleep 상시</td><td>약 1~2주</td></tr>
+                        <tr><td>Active 상시 (WiFi 켜짐)</td><td>약 6~8시간</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 대화 7 ==================== -->
+        <div class="section-divider" id="conv7">── 대화 7: 유선/무선 절전 모드 조합 설계 ──</div>
+
+        <div class="chat-section">
+            <div class="message user">
+                <div class="avatar">U</div>
+                <div class="bubble">
+                    <p>그러면 A 와 B가 유선 모드일 때와 무선 모드일 떄를 나누고 A에서 전력 모드 비교표의 각 모드들을 조정할 수 있게하여 다양한 절전모드 제공도 되겠네</p>
+                </div>
+            </div>
+
+            <div class="message assistant">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <h1>A의 절전 모드 시스템 설계</h1>
+
+                    <h2>연결 방식에 따른 모드 매트릭스</h2>
+                    <table>
+                        <tr><th>절전 모드</th><th>유선 연결 (GPIO 와이어)</th><th>무선 전용 (ESP-NOW only)</th></tr>
+                        <tr><td><strong>Ultra Save</strong> (Hibernation)</td><td>B가 GPIO로 깨움 → ESP-NOW 수신 → 갱신 → 재수면</td><td>24시간 타이머로만 깨어남</td></tr>
+                        <tr><td><strong>Deep Save</strong> (Deep Sleep)</td><td>B가 GPIO로 깨움 + 타이머 + 버튼</td><td>5분 폴링으로 B 메시지 확인</td></tr>
+                        <tr><td><strong>Light Save</strong> (Light Sleep)</td><td>GPIO/타이머/UART 모두 즉시 반응</td><td>ESP-NOW 주기적 수신 (30초 간격)</td></tr>
+                        <tr><td><strong>Always On</strong> (Modem Sleep)</td><td>상시 응답, 라디오만 끔</td><td>WiFi/BT 끄고 CPU 동작, ESP-NOW 상시 대기</td></tr>
+                    </table>
+
+                    <h2>사용자 시나리오별 프리셋</h2>
+                    <pre><code>┌─────────────────────────────────────────────────────────────┐
+│  프리셋 1: "액자 모드" (최대 절전)                             │
+│  모드: Hibernation / Deep Sleep                              │
+│  동작: 하루 1회 캘린더만 갱신                                  │
+│  유선: B→GPIO로 긴급 알림만 수신                               │
+│  무선: 타이머 깨어날 때만 잠깐 ESP-NOW                         │
+│  배터리: ★★★★★ (1년+)                                       │
+├─────────────────────────────────────────────────────────────┤
+│  프리셋 2: "스마트 디스플레이 모드" (균형)                     │
+│  모드: Deep Sleep + 5분 폴링                                  │
+│  동작: 날씨/뉴스/음악 정보 주기적 갱신                         │
+│  유선: B가 즉시 깨워서 정보 푸시 가능                          │
+│  무선: 5분마다 wake → 메시지 확인 → 재수면                     │
+│  배터리: ★★★☆☆ (3~6개월)                                    │
+├─────────────────────────────────────────────────────────────┤
+│  프리셋 3: "뮤직 플레이어 모드" (실시간)                       │
+│  모드: Light Sleep                                           │
+│  동작: 곡 변경 시 즉시 화면 갱신                               │
+│  유선: 즉시 반응 (&lt;1ms)                                      │
+│  무선: 30초 간격 체크 또는 Light Sleep GPIO wake               │
+│  배터리: ★★☆☆☆ (1~2주)                                      │
+├─────────────────────────────────────────────────────────────┤
+│  프리셋 4: "인터랙티브 모드" (상시 대기)                       │
+│  모드: Modem Sleep / Active                                   │
+│  동작: 버튼 즉시 반응, B와 실시간 양방향 통신                   │
+│  유선/무선: 차이 없음 (항상 깨어있음)                           │
+│  배터리: ★☆☆☆☆ (1~3일)                                      │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+
+                    <h2>모드 전환 코드</h2>
+                    <pre><code>enum PowerPreset {
+  PRESET_FRAME,       // 액자 모드
+  PRESET_SMART,       // 스마트 디스플레이
+  PRESET_MUSIC,       // 뮤직 플레이어
+  PRESET_INTERACTIVE  // 인터랙티브
+};
+
+RTC_DATA_ATTR PowerPreset currentPreset = PRESET_FRAME;
+
+void enterSleep() {
+  switch (currentPreset) {
+    case PRESET_FRAME:
+      esp_sleep_enable_timer_wakeup(24ULL * 3600 * 1000000);
+      if (wiredMode) 
+        esp_sleep_enable_ext1_wakeup(BIT(WIRE_PIN), ESP_EXT1_WAKEUP_ANY_HIGH);
+      esp_sleep_enable_ext0_wakeup(BUTTON_PIN, LOW);
+      esp_deep_sleep_start();
+      break;
+
+    case PRESET_SMART:
+      esp_sleep_enable_timer_wakeup(5ULL * 60 * 1000000);
+      if (wiredMode)
+        esp_sleep_enable_ext1_wakeup(BIT(WIRE_PIN), ESP_EXT1_WAKEUP_ANY_HIGH);
+      esp_sleep_enable_ext0_wakeup(BUTTON_PIN, LOW);
+      esp_deep_sleep_start();
+      break;
+
+    case PRESET_MUSIC:
+      esp_sleep_enable_timer_wakeup(30ULL * 1000000);
+      if (wiredMode)
+        gpio_wakeup_enable(WIRE_PIN, GPIO_INTR_HIGH_LEVEL);
+      esp_sleep_enable_gpio_wakeup();
+      esp_light_sleep_start();
+      handleWakeup();
+      break;
+
+    case PRESET_INTERACTIVE:
+      esp_wifi_stop();
+      break;
+  }
+}</code></pre>
+
+                    <h2>사용자 모드 전환 방법</h2>
+                    <table>
+                        <tr><th>방법</th><th>설명</th></tr>
+                        <tr><td>A의 물리 버튼</td><td>다이얼 스위치로 프리셋 선택 → OK 누르면 적용</td></tr>
+                        <tr><td>B에서 명령 전송</td><td>핸드폰 앱 → B → A로 모드 변경 명령</td></tr>
+                        <tr><td>자동 전환</td><td>B가 음악 재생 시작 → A를 Music 모드로 전환, 종료 → Frame 복귀</td></tr>
+                    </table>
+
+                    <h2>유선 vs 무선 핵심 차이</h2>
+                    <table>
+                        <tr><th></th><th>유선 (GPIO 1개 연결)</th><th>무선 전용</th></tr>
+                        <tr><td>B→A 즉시 깨우기</td><td>✅ 지연 0ms</td><td>❌ 폴링 간격만큼 지연</td></tr>
+                        <tr><td>배터리 추가 소모</td><td>없음</td><td>폴링 시마다 wake 전력 소모</td></tr>
+                        <tr><td>물리적 제약</td><td>와이어 1개 필요</td><td>완전 무선, 자유 배치</td></tr>
+                        <tr><td>최소 응답 시간</td><td>Deep Sleep에서도 ~500ms</td><td>폴링 주기에 의존</td></tr>
+                        <tr><td>Hibernation 사용</td><td>✅ ext1로 깨움 가능</td><td>⚠️ 타이머만 가능</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 대화 8 ==================== -->
+        <div class="section-divider" id="conv8">── 대화 8: 프로젝트 구체화 (기획서) ──</div>
+
+        <div class="chat-section">
+            <div class="message user">
+                <div class="avatar">U</div>
+                <div class="bubble">
+                    <p>우리가 대화한것들을 분석해서 이 프로젝트를 구체화 해 줄래?</p>
+                </div>
+            </div>
+
+            <div class="message assistant">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <h1>프로젝트 기획서: ESP32 듀얼 보드 스마트 디스플레이 시스템</h1>
+                    <h2>프로젝트명 (가칭): "DualCore Station"</h2>
+
+                    <h2>1. 프로젝트 개요</h2>
+                    <p>두 개의 ESP32 보드가 유/무선으로 연결되어, 하나는 초저전력 E-Paper 정보 디스플레이로, 다른 하나는 센서·API·오디오를 처리하는 허브로 동작하는 스마트 홈 시스템.</p>
+
+                    <h2>2. 하드웨어 구성</h2>
+                    <h3>A 보드: 디스플레이 유닛</h3>
+                    <table>
+                        <tr><th>항목</th><th>사양</th></tr>
+                        <tr><td>제품</td><td>CrowPanel ESP32 4.2" E-Paper HMI Display</td></tr>
+                        <tr><td>MCU</td><td>ESP32-S3-WROOM-1-N8R8 (240MHz)</td></tr>
+                        <tr><td>디스플레이</td><td>400×300, 흑백, SSD1683, SPI</td></tr>
+                        <tr><td>Flash / PSRAM</td><td>8MB / 8MB</td></tr>
+                        <tr><td>무선</td><td>WiFi + BLE 5.0 (A2DP 미지원)</td></tr>
+                        <tr><td>전원</td><td>BAT 포트 (SH1.0-2P) + USB-C 충전</td></tr>
+                    </table>
+
+                    <h3>B 보드: 프로세싱 허브</h3>
+                    <table>
+                        <tr><th>항목</th><th>사양</th></tr>
+                        <tr><td>제품</td><td>ESP32-WROVER-E 개발 보드 (권장)</td></tr>
+                        <tr><td>MCU</td><td>ESP32-D0WD (240MHz, 듀얼코어)</td></tr>
+                        <tr><td>Flash / PSRAM</td><td>4~16MB / 8MB PSRAM</td></tr>
+                        <tr><td>무선</td><td>WiFi + Bluetooth Classic (A2DP) + BLE</td></tr>
+                        <tr><td>오디오</td><td>A2DP Source (BT 스피커 출력 가능)</td></tr>
+                        <tr><td>전원</td><td>USB 또는 5V 어댑터 (상시 전원)</td></tr>
+                    </table>
+
+                    <h3>센서 (B에 연결)</h3>
+                    <table>
+                        <tr><th>센서</th><th>용도</th><th>인터페이스</th></tr>
+                        <tr><td>DHT22 / BME280</td><td>온도·습도</td><td>GPIO / I2C</td></tr>
+                        <tr><td>BH1750 / LDR</td><td>조도 감지</td><td>I2C / ADC</td></tr>
+                        <tr><td>HC-SR501 / AM312</td><td>PIR 인체 감지</td><td>GPIO</td></tr>
+                    </table>
+
+                    <h2>3. 시스템 다이어그램</h2>
+                    <pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                        외부 서비스                                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐    │
+│  │ Spotify  │  │ Weather  │  │ OpenAI   │  │ NTP Server   │    │
+│  │ Web API  │  │ API      │  │ API      │  │              │    │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬───────┘    │
+└───────┴──────────────┴─────────────┴───────────────┘────────────┘
+                               │ HTTPS
+                    ┌──────────▼──────────┐
+                    │     WiFi Router      │
+                    └──────────┬──────────┘
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+┌───────▼───────┐    ┌────────▼────────┐    ┌────────▼──────┐
+│  스마트폰 앱   │    │   B: Hub ESP32   │    │  BT Speaker   │
+│  • 명령 전송   │◄──►│  (WROVER-E)      │───►│  A2DP 오디오   │
+│  • 상태 확인   │WiFi│  • 센서 처리      │ BT │  • 라디오      │
+└───────────────┘    │  • API 호출       │    └───────────────┘
+                     │  • 오디오 스트림   │
+                     └────────┬──────────┘
+                              │ ESP-NOW + GPIO(유선)
+                     ┌────────▼──────────┐
+                     │  A: Display ESP32  │
+                     │  (CrowPanel 4.2") │
+                     │  • E-Paper 출력    │
+                     │  • Deep Sleep     │
+                     └───────────────────┘</code></pre>
+
+                    <h2>4. 기능 정의</h2>
+                    <h3>A 보드 기능</h3>
+                    <table>
+                        <tr><th>ID</th><th>기능</th><th>우선순위</th></tr>
+                        <tr><td>A-01</td><td>캘린더 표시 (날짜, 요일)</td><td>필수</td></tr>
+                        <tr><td>A-02</td><td>매일 00시 자동 갱신</td><td>필수</td></tr>
+                        <tr><td>A-03</td><td>4단계 절전 프리셋 전환</td><td>필수</td></tr>
+                        <tr><td>A-04</td><td>버튼으로 모드 변경, B에 명령</td><td>필수</td></tr>
+                        <tr><td>A-05</td><td>음악 정보 표시 (곡명, 아티스트, 앨범아트)</td><td>선택</td></tr>
+                        <tr><td>A-06</td><td>날씨 표시</td><td>선택</td></tr>
+                        <tr><td>A-07</td><td>뉴스 요약 표시</td><td>선택</td></tr>
+                        <tr><td>A-08</td><td>센서 데이터 표시</td><td>선택</td></tr>
+                    </table>
+
+                    <h3>B 보드 기능</h3>
+                    <table>
+                        <tr><th>ID</th><th>기능</th><th>우선순위</th></tr>
+                        <tr><td>B-01</td><td>센서 수집 (온도, 조도, PIR)</td><td>필수</td></tr>
+                        <tr><td>B-02</td><td>WiFi API 호출 (날씨, OpenAI, Spotify, NTP)</td><td>필수</td></tr>
+                        <tr><td>B-03</td><td>A 화면 갱신 요청 (ESP-NOW + GPIO wake)</td><td>필수</td></tr>
+                        <tr><td>B-04</td><td>스마트폰 연동 (WebServer/MQTT)</td><td>필수</td></tr>
+                        <tr><td>B-05</td><td>BT 스피커 오디오 (인터넷 라디오, 알림음)</td><td>필수</td></tr>
+                        <tr><td>B-06</td><td>Spotify 제어 (리모컨 역할)</td><td>필수</td></tr>
+                        <tr><td>B-07</td><td>4버튼 입력 처리</td><td>필수</td></tr>
+                        <tr><td>B-08</td><td>자동 모드 전환 (상황 판단)</td><td>선택</td></tr>
+                    </table>
+
+                    <h2>5. 절전 모드 체계</h2>
+                    <table>
+                        <tr><th>프리셋</th><th>이름</th><th>Sleep 모드</th><th>유선 응답</th><th>무선 응답</th><th>배터리</th></tr>
+                        <tr><td>1</td><td>액자</td><td>Hibernation</td><td>즉시 (GPIO)</td><td>24시간 후</td><td>~2년</td></tr>
+                        <tr><td>2</td><td>스마트</td><td>Deep Sleep</td><td>즉시 (GPIO)</td><td>최대 5분</td><td>3~6개월</td></tr>
+                        <tr><td>3</td><td>뮤직</td><td>Light Sleep</td><td>즉시 (&lt;1ms)</td><td>최대 30초</td><td>1~2주</td></tr>
+                        <tr><td>4</td><td>라이브</td><td>Modem Sleep</td><td>즉시</td><td>즉시</td><td>1~3일</td></tr>
+                    </table>
+
+                    <h2>6. 통신 프로토콜 (ESP-NOW)</h2>
+                    <pre><code>typedef struct {
+  uint8_t msgType;
+  uint8_t msgId;
+  uint16_t payloadLen;
+} MsgHeader;
+
+enum MsgType {
+  MSG_DISPLAY_CALENDAR = 0x01,
+  MSG_DISPLAY_MUSIC    = 0x02,
+  MSG_DISPLAY_WEATHER  = 0x03,
+  MSG_DISPLAY_NEWS     = 0x04,
+  MSG_DISPLAY_SENSOR   = 0x05,
+  MSG_CHANGE_PRESET    = 0x10,
+  MSG_TIME_SYNC        = 0x11,
+  MSG_BUTTON_EVENT     = 0x20,
+  MSG_REQUEST_DATA     = 0x21,
+  MSG_ACK              = 0xFF
+};</code></pre>
+
+                    <h2>7. 화면 레이아웃 (400×300)</h2>
+                    <pre><code>캘린더 모드:
+┌──────────────────────────────────────┐
+│           2026                        │
+│         May 11                       │
+│        Sunday                        │
+│──────────────────────────────────────│
+│  🌡 24°C    ☀ 맑음                   │
+│──────────────────────────────────────│
+│  ♪ 재생 없음          🔋 87%         │
+└──────────────────────────────────────┘
+
+음악 모드:
+┌──────────────────────────────────────┐
+│  ♪ Now Playing                       │
+│──────────────────────────────────────│
+│   [Album Art]  │  곡 제목             │
+│   120×120 BW   │  아티스트            │
+│                │  앨범                │
+│──────────────────────────────────────│
+│  ◄◄    ▶    ►►       03:24/04:51     │
+│  🌡 24°C       May 11 Sun    🔋 87%  │
+└──────────────────────────────────────┘</code></pre>
+
+                    <h2>8. B 보드 소프트웨어 구조</h2>
+                    <pre><code>// FreeRTOS 멀티태스킹
+void setup() {
+  initWiFi();
+  initESPNOW();
+  initBluetooth();
+  initSensors();
+  initButtons();
+  
+  xTaskCreatePinnedToCore(taskSensor, "sensor",  4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(taskAPI,    "api",     8192, NULL, 2, NULL, 0);
+  xTaskCreatePinnedToCore(taskAudio,  "audio", 16384, NULL, 3, NULL, 1);
+  xTaskCreatePinnedToCore(taskCommA,  "commA",  4096, NULL, 2, NULL, 0);
+  xTaskCreatePinnedToCore(taskPhone,  "phone",  4096, NULL, 1, NULL, 0);
+}
+// Core 0: 센서, API, ESP-NOW, 폰 통신
+// Core 1: 오디오 스트리밍 전용</code></pre>
+
+                    <h2>9. 개발 환경</h2>
+                    <table>
+                        <tr><th>항목</th><th>A 보드</th><th>B 보드</th></tr>
+                        <tr><td>프레임워크</td><td>Arduino + ESP-IDF</td><td>Arduino + ESP-ADF</td></tr>
+                        <tr><td>디스플레이</td><td>GxEPD2, Adafruit GFX</td><td>-</td></tr>
+                        <tr><td>통신</td><td>ESP-NOW</td><td>ESP-NOW, WiFi, HTTPClient</td></tr>
+                        <tr><td>오디오</td><td>-</td><td>ESP32-A2DP, ESP-ADF</td></tr>
+                        <tr><td>폰 연동</td><td>-</td><td>ESPAsyncWebServer</td></tr>
+                    </table>
+
+                    <h2>10. 개발 로드맵</h2>
+                    <table>
+                        <tr><th>단계</th><th>기간</th><th>목표</th></tr>
+                        <tr><td>Phase 1</td><td>2주</td><td>A: 캘린더 화면 + Deep Sleep + 버튼</td></tr>
+                        <tr><td>Phase 2</td><td>2주</td><td>B: 센서 + WiFi API (날씨, NTP)</td></tr>
+                        <tr><td>Phase 3</td><td>2주</td><td>A↔B ESP-NOW 통신 + GPIO wake-up</td></tr>
+                        <tr><td>Phase 4</td><td>2주</td><td>B: 인터넷 라디오 + A2DP BT 스피커</td></tr>
+                        <tr><td>Phase 5</td><td>2주</td><td>B: Spotify API + A: 음악 화면</td></tr>
+                        <tr><td>Phase 6</td><td>1주</td><td>B: OpenAI API + A: 뉴스 화면</td></tr>
+                        <tr><td>Phase 7</td><td>1주</td><td>스마트폰 웹 인터페이스</td></tr>
+                        <tr><td>Phase 8</td><td>2주</td><td>자동 모드 전환, 안정화, 최적화</td></tr>
+                    </table>
+                    <p><strong>총 예상 기간: 약 12~14주</strong></p>
+
+                    <h2>11. BOM (부품 리스트)</h2>
+                    <table>
+                        <tr><th>부품</th><th>수량</th><th>비고</th></tr>
+                        <tr><td>CrowPanel ESP32 4.2" E-Paper</td><td>1</td><td>A 보드</td></tr>
+                        <tr><td>ESP32-WROVER-E 개발 보드</td><td>1</td><td>B 보드</td></tr>
+                        <tr><td>DHT22 또는 BME280</td><td>1</td><td>온습도 센서</td></tr>
+                        <tr><td>BH1750</td><td>1</td><td>조도 센서</td></tr>
+                        <tr><td>HC-SR501 / AM312</td><td>1</td><td>PIR 모션 센서</td></tr>
+                        <tr><td>택트 스위치</td><td>4</td><td>B 보드 버튼</td></tr>
+                        <tr><td>블루투스 스피커</td><td>1</td><td>A2DP 지원</td></tr>
+                        <tr><td>점퍼 와이어</td><td>2</td><td>유선 wake-up</td></tr>
+                        <tr><td>3.7V LiPo 배터리</td><td>1</td><td>A 보드 (1500~3000mAh)</td></tr>
+                        <tr><td>5V USB 어댑터</td><td>1</td><td>B 보드 상시 전원</td></tr>
+                    </table>
+
+                    <h2>12. 리스크 및 대응</h2>
+                    <table>
+                        <tr><th>리스크</th><th>대응책</th></tr>
+                        <tr><td>ESP-NOW + WiFi 채널 충돌</td><td>같은 WiFi 채널로 고정, 시분할</td></tr>
+                        <tr><td>BT 오디오 + WiFi 동시 끊김</td><td>Core 분리, API 호출을 오디오 갭에 배치</td></tr>
+                        <tr><td>한글 폰트 메모리 부족</td><td>B에서 비트맵 렌더링 후 전송</td></tr>
+                        <tr><td>ESP-NOW 250바이트 제한</td><td>분할 전송 (8패킷)</td></tr>
+                        <tr><td>Deep Sleep 실측 전류 초과</td><td>GPIO7 OFF 확인, IO isolate</td></tr>
+                    </table>
+
+                    <h2>13. 확장 가능성</h2>
+                    <ul>
+                        <li>Google Calendar API 연동</li>
+                        <li>Home Assistant 연동</li>
+                        <li>TTS 음성 알림</li>
+                        <li>다중 A 디스플레이 (방마다 하나)</li>
+                        <li>OTA 무선 펌웨어 업데이트</li>
+                        <li>부분 새로고침 활용 시계 애니메이션</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding: 40px 20px; color: #607d8b; font-size: 0.85em; border-top: 1px solid #2a2a4a; margin-top: 40px;">
+            <p>DualCore Station 프로젝트 대화 기록</p>
+            <p>생성일: 2026-05-11 | 총 8개 대화 세션</p>
+        </div>
+    </div>
+</body>
+</html>
