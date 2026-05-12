@@ -4,243 +4,216 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>마프 프로젝트 대화 기록</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
-            background-color: #1a1a2e;
-            color: #e0e0e0;
-            line-height: 1.7;
-            padding: 20px;
-        }
+body {
+    font-family: -apple-system, BlinkMacSystemFont,
+        'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+    background-color: #ffffff;   /* ★ 흰 배경 */
+    color: #111111;              /* ★ 진한 검정 텍스트 */
+    line-height: 1.7;
+    padding: 20px;
+}
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+}
 
-        .header {
-            text-align: center;
-            padding: 40px 20px;
-            margin-bottom: 30px;
-            background: linear-gradient(135deg, #16213e, #0f3460);
-            border-radius: 16px;
-            border: 1px solid #0f3460;
-        }
+.header {
+    text-align: center;
+    padding: 40px 20px;
+    margin-bottom: 30px;
+    background: #f5f5f5;         /* ★ 밝은 회색 헤더 */
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;   /* ★ 얇은 회색 테두리 */
+}
 
-        .header h1 {
-            font-size: 1.8em;
-            color: #4fc3f7;
-            margin-bottom: 10px;
-        }
+.header h1 {
+    font-size: 1.8em;
+    color: #111111;              /* ★ 검정 제목 */
+    margin-bottom: 10px;
+}
 
-        .header p {
-            color: #90a4ae;
-            font-size: 0.9em;
-        }
+.header p {
+    color: #888888;              /* ★ 회색 서브텍스트 */
+    font-size: 0.9em;
+}
 
-        .chat-section {
-            margin-bottom: 40px;
-        }
+.section-divider {
+    text-align: center;
+    margin: 40px 0 30px;
+    padding-top: 20px;
+    color: #aaaaaa;              /* ★ 연회색 구분선 텍스트 */
+    font-size: 0.85em;
+    border-top: 1px solid #e0e0e0;
+}
 
-        .section-divider {
-            text-align: center;
-            margin: 40px 0 30px;
-            padding: 10px;
-            color: #4fc3f7;
-            font-size: 0.85em;
-            border-top: 1px solid #2a2a4a;
-            padding-top: 20px;
-        }
+.message {
+    display: flex;
+    margin-bottom: 20px;
+    gap: 12px;
+    align-items: flex-start;
+}
 
-        .message {
-            display: flex;
-            margin-bottom: 20px;
-            gap: 12px;
-            align-items: flex-start;
-        }
+.message.user {
+    flex-direction: row-reverse;
+}
 
-        .message.user {
-            flex-direction: row-reverse;
-        }
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+    font-weight: bold;
+    flex-shrink: 0;
+}
 
-        .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8em;
-            font-weight: bold;
-            flex-shrink: 0;
-        }
+.message.user .avatar {
+    background: #111111;         /* ★ 검정 아바타 */
+    color: #ffffff;
+}
 
-        .message.user .avatar {
-            background: #4fc3f7;
-            color: #1a1a2e;
-        }
+.message.assistant .avatar {
+    background: #ffffff;         /* ★ 흰 아바타 */
+    color: #111111;
+    border: 1px solid #cccccc;
+}
 
-        .message.assistant .avatar {
-            background: #7c4dff;
-            color: white;
-        }
+.bubble {
+    max-width: 78%;
+    padding: 16px 20px;
+    border-radius: 16px;
+    font-size: 0.92em;
+}
 
-        .bubble {
-            max-width: 78%;
-            padding: 16px 20px;
-            border-radius: 16px;
-            font-size: 0.92em;
-        }
+.message.user .bubble {
+    background: #111111;         /* ★ 검정 말풍선 */
+    color: #ffffff;
+    border: none;
+    border-top-right-radius: 4px;
+}
 
-        .message.user .bubble {
-            background: #1e3a5f;
-            border: 1px solid #2a5a8f;
-            border-top-right-radius: 4px;
-        }
+.message.assistant .bubble {
+    background: #f5f5f5;         /* ★ 밝은 회색 말풍선 */
+    color: #111111;
+    border: 1px solid #e0e0e0;
+    border-top-left-radius: 4px;
+}
 
-        .message.assistant .bubble {
-            background: #2a2a4a;
-            border: 1px solid #3a3a5a;
-            border-top-left-radius: 4px;
-        }
+.bubble h1 {
+    font-size: 1.3em;
+    color: #111111;
+    margin: 16px 0 10px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 6px;
+}
 
-        .bubble h1 {
-            font-size: 1.3em;
-            color: #4fc3f7;
-            margin: 16px 0 10px;
-            border-bottom: 1px solid #3a3a5a;
-            padding-bottom: 6px;
-        }
+.bubble h1:first-child { margin-top: 0; }
 
-        .bubble h1:first-child {
-            margin-top: 0;
-        }
+.bubble h2 {
+    font-size: 1.1em;
+    color: #333333;
+    margin: 14px 0 8px;
+}
 
-        .bubble h2 {
-            font-size: 1.1em;
-            color: #81d4fa;
-            margin: 14px 0 8px;
-        }
+.bubble h3 {
+    font-size: 1em;
+    color: #555555;
+    margin: 12px 0 6px;
+}
 
-        .bubble h3 {
-            font-size: 1em;
-            color: #b3e5fc;
-            margin: 12px 0 6px;
-        }
+.bubble p { margin-bottom: 10px; }
 
-        .bubble p {
-            margin-bottom: 10px;
-        }
+.bubble ul, .bubble ol {
+    margin: 8px 0 8px 20px;
+}
 
-        .bubble ul, .bubble ol {
-            margin: 8px 0 8px 20px;
-        }
+.bubble li { margin-bottom: 4px; }
 
-        .bubble li {
-            margin-bottom: 4px;
-        }
+.bubble table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 0.85em;
+}
 
-        .bubble table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 12px 0;
-            font-size: 0.85em;
-        }
+.bubble th, .bubble td {
+    border: 1px solid #e0e0e0;
+    padding: 8px 10px;
+    text-align: left;
+}
 
-        .bubble th, .bubble td {
-            border: 1px solid #3a3a5a;
-            padding: 8px 10px;
-            text-align: left;
-        }
+.bubble th {
+    background: #f0f0f0;         /* ★ 연회색 테이블 헤더 */
+    color: #111111;
+}
 
-        .bubble th {
-            background: #1a1a3e;
-            color: #4fc3f7;
-        }
+.bubble code {
+    background: #e8e8e8;         /* ★ 밝은 코드 배경 */
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 0.88em;
+    color: #333333;
+}
 
-        .bubble code {
-            background: #1a1a3e;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Fira Code', 'Consolas', monospace;
-            font-size: 0.88em;
-            color: #80cbc4;
-        }
+.bubble pre {
+    background: #f0f0f0;         /* ★ 밝은 코드블록 */
+    padding: 14px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 10px 0;
+    border: 1px solid #e0e0e0;
+}
 
-        .bubble pre {
-            background: #0d0d1a;
-            padding: 14px;
-            border-radius: 8px;
-            overflow-x: auto;
-            margin: 10px 0;
-            border: 1px solid #2a2a4a;
-        }
+.bubble pre code {
+    background: none;
+    padding: 0;
+    color: #222222;
+    font-size: 0.82em;
+    line-height: 1.5;
+}
 
-        .bubble pre code {
-            background: none;
-            padding: 0;
-            color: #a5d6a7;
-            font-size: 0.82em;
-            line-height: 1.5;
-        }
+.toc {
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
 
-        .bubble .highlight-green { color: #4caf50; }
-        .bubble .highlight-yellow { color: #ffd54f; }
-        .bubble .highlight-red { color: #ef5350; }
+.toc h2 {
+    color: #111111;
+    margin-bottom: 12px;
+    font-size: 1.1em;
+}
 
-        .toc {
-            background: #16213e;
-            border: 1px solid #0f3460;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
+.toc ul { list-style: none; padding: 0; }
+.toc li { padding: 4px 0; }
 
-        .toc h2 {
-            color: #4fc3f7;
-            margin-bottom: 12px;
-            font-size: 1.1em;
-        }
+.toc a {
+    color: #444444;              /* ★ 어두운 회색 링크 */
+    text-decoration: none;
+}
 
-        .toc ul {
-            list-style: none;
-            padding: 0;
-        }
+.toc a:hover {
+    color: #111111;
+    text-decoration: underline;
+}
 
-        .toc li {
-            padding: 4px 0;
-        }
-
-        .toc a {
-            color: #81d4fa;
-            text-decoration: none;
-        }
-
-        .toc a:hover {
-            color: #4fc3f7;
-            text-decoration: underline;
-        }
-
-        @media (max-width: 768px) {
-            .bubble {
-                max-width: 90%;
-            }
-
-            .header h1 {
-                font-size: 1.4em;
-            }
-
-            body {
-                padding: 10px;
-            }
-        }
-    </style>
+@media (max-width: 768px) {
+    .bubble { max-width: 90%; }
+    .header h1 { font-size: 1.4em; }
+    body { padding: 10px; }
+}
 </head>
 <body>
     <div class="container">
