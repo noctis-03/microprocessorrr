@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DualCore Station — 단계별 구현 가이드</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d29922;
+    --accent4: #f47067;
+    --accent5: #bc8cff;
+    --code-bg: #0d1117;
+    --phase1: #58a6ff;
+    --phase2: #3fb950;
+    --phase3: #d29922;
+    --phase4: #f47067;
+    --phase5: #bc8cff;
+    --phase6: #f778ba;
+    --phase7: #79c0ff;
+    --phase8: #56d364;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1a1e2e 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 60px 20px 50px;
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: 2.6em;
+    letter-spacing: -1px;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg, var(--accent), var(--accent5));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero .subtitle { color: var(--text-muted); font-size: 1.15em; }
+  .hero .badge-row { margin-top: 18px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.82em;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  /* ── Container ── */
+  .container { max-width: 960px; margin: 0 auto; padding: 0 20px 80px; }
+  /* ── TOC ── */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin: 40px 0;
+  }
+  .toc h2 { font-size: 1.2em; margin-bottom: 14px; color: var(--accent); }
+  .toc ol { padding-left: 22px; }
+  .toc li { margin: 6px 0; }
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--border);
+    transition: color .2s;
+  }
+  .toc a:hover { color: var(--accent); }
+  .toc .phase-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  /* ── Architecture ── */
+  .arch-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 24px;
+    margin: 30px 0;
+    overflow-x: auto;
+  }
+  .arch-box h2 { color: var(--accent); margin-bottom: 16px; font-size: 1.2em; }
+  .arch-box pre {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82em;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+  /* ── BOM ── */
+  .bom-table { width: 100%; border-collapse: collapse; margin: 16px 0 0; font-size: 0.92em; }
+  .bom-table th, .bom-table td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  .bom-table th { background: var(--surface2); color: var(--accent); font-weight: 600; }
+  .bom-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  /* ── Alert ── */
+  .alert {
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 28px 0;
+    font-size: 0.95em;
+    line-height: 1.6;
+  }
+  .alert-warn {
+    background: rgba(210,153,34,0.1);
+    border-left: 4px solid var(--accent3);
+  }
+  .alert-warn .alert-title { color: var(--accent3); font-weight: 700; }
+  .alert-info {
+    background: rgba(88,166,255,0.08);
+    border-left: 4px solid var(--accent);
+  }
+  .alert-info .alert-title { color: var(--accent); font-weight: 700; }
+  .alert-ok {
+    background: rgba(63,185,80,0.08);
+    border-left: 4px solid var(--accent2);
+  }
+  .alert-ok .alert-title { color: var(--accent2); font-weight: 700; }
+  /* ── Phase Card ── */
+  .phase {
+    margin: 50px 0;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .phase-header {
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: default;
+  }
+  .phase-num {
+    font-size: 1.5em;
+    font-weight: 800;
+    width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 12px;
+    flex-shrink: 0;
+  }
+  .phase-header-text h2 { font-size: 1.35em; line-height: 1.3; }
+  .phase-header-text .phase-meta { font-size: 0.88em; color: var(--text-muted); }
+  .phase-body { padding: 0 28px 28px; }
+  /* ── Step ── */
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .step-title {
+    padding: 14px 20px;
+    font-weight: 700;
+    font-size: 1.02em;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .step-title .step-num {
+    background: var(--accent);
+    color: #000;
+    font-size: 0.78em;
+    font-weight: 800;
+    padding: 2px 9px;
+    border-radius: 6px;
+  }
+  .step-content { padding: 18px 20px; }
+  .step-content p { margin: 8px 0; color: var(--text); }
+  .step-content ul { padding-left: 20px; margin: 8px 0; }
+  .step-content li { margin: 4px 0; color: var(--text-muted); }
+  /* ── Code ── */
+  pre.code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.84em;
+    line-height: 1.55;
+    margin: 12px 0;
+    color: #c9d1d9;
+  }
+  code.inline {
+    background: var(--surface2);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 0.9em;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  }
+  /* ── Pin table ── */
+  .pin-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.88em; }
+  .pin-table th, .pin-table td { padding: 8px 12px; border: 1px solid var(--border); }
+  .pin-table th { background: var(--surface2); color: var(--accent); font-weight: 600; text-align: left; }
+  .pin-table .used { color: var(--accent4); }
+  .pin-table .free { color: var(--accent2); }
+  /* ── Wiring ── */
+  .wiring {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 14px 0;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.86em;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+  /* ── Checklist ── */
+  .checklist { list-style: none; padding: 0; margin: 16px 0; }
+  .checklist li {
+    padding: 8px 0 8px 32px;
+    position: relative;
+    color: var(--text);
+  }
+  .checklist li::before {
+    content: '☐';
+    position: absolute;
+    left: 4px;
+    font-size: 1.1em;
+  }
+  /* ── Summary ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .summary-card h4 { color: var(--accent); margin-bottom: 6px; }
+  .summary-card .big-num { font-size: 2em; font-weight: 800; }
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    border-top: 1px solid var(--border);
+  }
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .hero h1 { font-size: 1.8em; }
+    .summary-grid { grid-template-columns: 1fr; }
+    .phase-body { padding: 0 16px 20px; }
+    .step-content { padding: 14px 16px; }
+    pre.code-block { font-size: 0.76em; padding: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════ HERO ════════════════════ -->
+<section class="hero">
+  <h1>⚡ DualCore Station</h1>
+  <p class="subtitle">ESP32 듀얼 보드 스마트 디스플레이 시스템 — 단계별 구현 가이드</p>
+  <div class="badge-row">
+    <span class="badge" style="color:var(--accent)">A: CrowPanel 4.2" E-Paper</span>
+    <span class="badge" style="color:var(--accent2)">B: Heltec WiFi LoRa V3</span>
+    <span class="badge" style="color:var(--accent5)">ESP-NOW</span>
+    <span class="badge" style="color:var(--accent3)">I2S Audio</span>
+  </div>
+</section>
+
+<div class="container">
+
+<!-- ════════════════════ ALERT ════════════════════ -->
+<div class="alert alert-warn">
+  <div class="alert-title">⚠️ Heltec WiFi LoRa V3 = ESP32-S3 — 중요 제약사항</div>
+  <p>ESP32-S3는 <strong>Bluetooth Classic (A2DP)를 지원하지 않습니다.</strong> 따라서 BT 스피커로 직접 오디오 전송이 불가능합니다.<br>
+  이 가이드에서는 <strong>I2S DAC (MAX98357A) + 유선 스피커</strong>로 오디오를 출력합니다. Spotify 음악은 핸드폰에서 재생하고, B는 리모컨 역할만 합니다.</p>
+</div>
+
+<!-- ════════════════════ ARCH ════════════════════ -->
+<div class="arch-box">
+  <h2>🏗️ 시스템 아키텍처</h2>
+<pre>
+┌───────────────────────────────────────────────────────┐
+│                    외부 서비스 (HTTPS)                   │
+│  Spotify API · Weather API · OpenAI API · NTP Server  │
+└──────────────────────┬────────────────────────────────┘
+                       │
+            ┌──────────▼──────────┐
+            │     WiFi Router      │
+            └──────┬─────┬────────┘
+                   │     │
+  ┌────────────────▼─┐ ┌─▼────────────────────┐
+  │  📱 스마트폰      │ │  B: Heltec LoRa V3    │
+  │  (WebServer 접속) │ │  (ESP32-S3 + SX1262)  │──I2S──▶🔊 스피커
+  └──────────────────┘ │                        │
+                       │  센서 · API · 오디오    │
+                       └──────────┬─────────────┘
+                                  │
+                       ESP-NOW + GPIO (유선 wake)
+                                  │
+                       ┌──────────▼─────────────┐
+                       │  A: CrowPanel 4.2"      │
+                       │  E-Paper (ESP32-S3)     │
+                       │  📅 캘린더 · 🎵 음악     │
+                       │  🌤️ 날씨 · 📰 뉴스      │
+                       │  🔋 배터리 구동           │
+                       └────────────────────────┘
+</pre>
+</div>
+
+<!-- ════════════════════ BOM ════════════════════ -->
+<div class="arch-box">
+  <h2>📦 부품 리스트 (BOM)</h2>
+  <table class="bom-table">
+    <thead><tr><th>부품</th><th>수량</th><th>용도</th><th>예상가</th></tr></thead>
+    <tbody>
+      <tr><td>CrowPanel ESP32 4.2" E-Paper</td><td>1</td><td>A 디스플레이 보드</td><td>~$20</td></tr>
+      <tr><td>Heltec WiFi LoRa V3</td><td>1</td><td>B 프로세싱 허브</td><td>~$18</td></tr>
+      <tr><td>MAX98357A I2S 앰프 모듈</td><td>1</td><td>오디오 출력</td><td>~$3</td></tr>
+      <tr><td>소형 스피커 (4Ω 3W)</td><td>1</td><td>사운드</td><td>~$2</td></tr>
+      <tr><td>BME280 (I2C)</td><td>1</td><td>온습도 + 기압</td><td>~$3</td></tr>
+      <tr><td>BH1750 (I2C)</td><td>1</td><td>조도 센서</td><td>~$2</td></tr>
+      <tr><td>AM312 PIR</td><td>1</td><td>모션 감지</td><td>~$1</td></tr>
+      <tr><td>택트 스위치</td><td>4</td><td>B 보드 버튼</td><td>~$1</td></tr>
+      <tr><td>3.7V LiPo 배터리 1500mAh+</td><td>1</td><td>A 전원</td><td>~$5</td></tr>
+      <tr><td>5V USB 어댑터</td><td>1</td><td>B 상시 전원</td><td>보유분</td></tr>
+      <tr><td>점퍼 와이어</td><td>2</td><td>유선 wake (신호+GND)</td><td>~$0</td></tr>
+      <tr><td>10KΩ 저항</td><td>1</td><td>A 풀다운</td><td>~$0</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ════════════════════ TOC ════════════════════ -->
+<nav class="toc">
+  <h2>📋 목차 — 8단계 구현 로드맵</h2>
+  <ol>
+    <li><span class="phase-dot" style="background:var(--phase1)"></span><a href="#phase1">Phase 1 — 환경 설정 + A 캘린더 화면 (2주)</a></li>
+    <li><span class="phase-dot" style="background:var(--phase2)"></span><a href="#phase2">Phase 2 — B 기본 설정 + 센서 (2주)</a></li>
+    <li><span class="phase-dot" style="background:var(--phase3)"></span><a href="#phase3">Phase 3 — A↔B 통신 + 절전 모드 (2주)</a></li>
+    <li><span class="phase-dot" style="background:var(--phase4)"></span><a href="#phase4">Phase 4 — WiFi API 연동 (2주)</a></li>
+    <li><span class="phase-dot" style="background:var(--phase5)"></span><a href="#phase5">Phase 5 — I2S 오디오 출력 (2주)</a></li>
+    <li><span class="phase-dot" style="background:var(--phase6)"></span><a href="#phase6">Phase 6 — 스마트폰 연동 (1주)</a></li>
+    <li><span class="phase-dot" style="background:var(--phase7)"></span><a href="#phase7">Phase 7 — 통합 + 자동화 (2주)</a></li>
+    <li><span class="phase-dot" style="background:var(--phase8)"></span><a href="#phase8">Phase 8 — 최적화 + 마무리 (2주)</a></li>
+  </ol>
+</nav>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║                    PHASE 1                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="phase" id="phase1">
+  <div class="phase-header" style="background:linear-gradient(135deg, rgba(88,166,255,0.12), transparent);">
+    <div class="phase-num" style="background:var(--phase1);color:#000;">1</div>
+    <div class="phase-header-text">
+      <h2>환경 설정 + A 캘린더 화면</h2>
+      <span class="phase-meta">📅 2주 · A 보드 (CrowPanel 4.2" E-Paper)</span>
+    </div>
+  </div>
+  <div class="phase-body">
+
+    <!-- Step 1-1 -->
+    <div class="step">
+      <div class="step-title"><span class="step-num">1-1</span> 개발 환경 구축</div>
+      <div class="step-content">
+        <p>Arduino IDE 2.x를 설치하고 보드와 라이브러리를 추가합니다.</p>
+<pre class="code-block">
+<strong>// File → Preferences → Additional Board Manager URLs에 추가:</strong>
+https://github.com/Heltec-Aaron-Lee/WiFi_Kit_series/releases/download/0.0.9/package_heltec_esp32_index.json
+https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+<strong>// Board Manager에서 설치:</strong>
+✅ "Heltec ESP32"         → B 보드용
+✅ "esp32 by Espressif"   → A 보드용
+
+<strong>// Library Manager에서 설치:</strong>
+✅ GxEPD2
+✅ Adafruit GFX Library
+✅ Adafruit BusIO
+✅ ArduinoJson
+✅ U8g2_for_Adafruit_GFX   → 한글 폰트용
+✅ ESP8266Audio             → Phase 5 오디오용
+</pre>
+      </div>
+    </div>
+
+    <!-- Step 1-2 -->
+    <div class="step">
+      <div class="step-title"><span class="step-num">1-2</span> A 보드 설정 + Hello World</div>
+      <div class="step-content">
+        <p><strong>Arduino IDE 보드 설정:</strong></p>
+<pre class="code-block">
+Board:            ESP32S3 Dev Module
+Partition Scheme: Huge APP (3MB No OTA / 1MB SPIFFS)
+PSRAM:            OPI PSRAM
+Port:             (CrowPanel 연결 후 선택)
+</pre>
+        <p><strong>첫 번째 코드 — 화면에 텍스트 표시:</strong></p>
+<pre class="code-block">
+#include "GxEPD2_BW.h"
+
+// CrowPanel 4.2" 핀 정의
+#define EPD_PWR  7
+#define EPD_BUSY 48
+#define EPD_RES  47
+#define EPD_DC   46
+#define EPD_CS   45
+
+GxEPD2_BW&lt;GxEPD2_420_GYE042A87, GxEPD2_420_GYE042A87::HEIGHT&gt;
+  display(GxEPD2_420_GYE042A87(EPD_CS, EPD_DC, EPD_RES, EPD_BUSY));
+
+void epdPower(bool on) {
+  pinMode(EPD_PWR, OUTPUT);
+  digitalWrite(EPD_PWR, on ? HIGH : LOW);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  epdPower(true);
+  display.init(115200, true, 50, false);
+  display.setRotation(0);
+  display.setTextColor(GxEPD_BLACK);
+  display.setTextSize(3);
+  display.setFullWindow();
+
+  display.fillScreen(GxEPD_WHITE);
+  display.setCursor(50, 140);
+  display.print("Hello, DualCore!");
+  display.display();
+
+  display.hibernate();
+  epdPower(false);
+  Serial.println("Display done.");
+}
+
+void loop() {}
+</pre>
+        <div class="alert alert-info">
+          <div class="alert-title">💡 CrowPanel 핵심 포인트</div>
+          <p><code class="inline">GPIO 7</code>로 디스플레이 전원을 제어합니다. <code class="inline">epdPower(false)</code> 이후에도 화면 내용은 유지됩니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 1-3 -->
+    <div class="step">
+      <div class="step-title"><span class="step-num">1-3</span> 캘린더 화면 구현</div>
+      <div class="step-content">
+<pre class="code-block">
+#include "GxEPD2_BW.h"
+#include &lt;Fonts/FreeMonoBold24pt7b.h&gt;
+#include &lt;Fonts/FreeMonoBold18pt7b.h&gt;
+#include &lt;Fonts/FreeSans9pt7b.h&gt;
+
+#define EPD_PWR 7
+#define EPD_BUSY 48
+#define EPD_RES 47
+#define EPD_DC 46
+#define EPD_CS 45
+
+GxEPD2_BW&lt;GxEPD2_420_GYE042A87, GxEPD2_420_GYE042A87::HEIGHT&gt;
+  display(GxEPD2_420_GYE042A87(EPD_CS, EPD_DC, EPD_RES, EPD_BUSY));
+
+// RTC 메모리 — Deep Sleep 사이에도 유지됨
+RTC_DATA_ATTR int savedYear  = 2026;
+RTC_DATA_ATTR int savedMonth = 6;
+RTC_DATA_ATTR int savedDay   = 1;
+RTC_DATA_ATTR int bootCount  = 0;
+
+const char* weekdays[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+const char* months[]   = {"Jan","Feb","Mar","Apr","May","Jun",
+                           "Jul","Aug","Sep","Oct","Nov","Dec"};
+
+void epdPower(bool on) {
+  pinMode(EPD_PWR, OUTPUT);
+  digitalWrite(EPD_PWR, on ? HIGH : LOW);
+}
+
+int getDayOfWeek(int y, int m, int d) {
+  struct tm t = {0};
+  t.tm_year = y - 1900;  t.tm_mon = m - 1;  t.tm_mday = d;
+  mktime(&amp;t);
+  return t.tm_wday;
+}
+
+void incrementDate() {
+  int dim[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+  if (savedYear % 4 == 0) dim[1] = 29;
+  savedDay++;
+  if (savedDay &gt; dim[savedMonth - 1]) {
+    savedDay = 1;  savedMonth++;
+    if (savedMonth &gt; 12) { savedMonth = 1; savedYear++; }
+  }
+}
+
+void drawCalendar() {
+  epdPower(true);
+  display.init(115200, true, 50, false);
+  display.setRotation(0);
+  display.setFullWindow();
+  display.fillScreen(GxEPD_WHITE);
+
+  int dow = getDayOfWeek(savedYear, savedMonth, savedDay);
+
+  // 년도
+  display.setFont(&amp;FreeMonoBold24pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  display.setCursor(130, 55);
+  display.print(savedYear);
+
+  display.drawLine(30, 70, 370, 70, GxEPD_BLACK);
+
+  // 월 + 일
+  display.setCursor(60, 150);
+  char buf[32];
+  sprintf(buf, "%s %d", months[savedMonth - 1], savedDay);
+  display.print(buf);
+
+  // 요일
+  display.setFont(&amp;FreeMonoBold18pt7b);
+  display.setCursor(130, 200);
+  display.print(weekdays[dow]);
+
+  display.drawLine(30, 230, 370, 230, GxEPD_BLACK);
+
+  // 하단 상태
+  display.setFont(&amp;FreeSans9pt7b);
+  display.setCursor(30, 270);
+  sprintf(buf, "Boot #%d", bootCount);
+  display.print(buf);
+  display.setCursor(270, 270);
+  display.print("Frame Mode");
+
+  display.display();
+  display.hibernate();
+  epdPower(false);
+}
+
+void setup() {
+  bootCount++;
+  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+  if (cause == ESP_SLEEP_WAKEUP_TIMER) incrementDate();
+
+  drawCalendar();
+
+  // 24시간 타이머 → Deep Sleep
+  esp_sleep_enable_timer_wakeup(24ULL * 3600 * 1000000);
+  esp_deep_sleep_start();
+}
+
+void loop() {}
+</pre>
+      </div>
+    </div>
+
+    <!-- Step 1-4 -->
+    <div class="step">
+      <div class="step-title"><span class="step-num">1-4</span> 버튼 Wake-up 추가</div>
+      <div class="step-content">
+        <p>MENU 버튼(GPIO 2)을 눌러도 Deep Sleep에서 깨어나도록 합니다.</p>
+<pre class="code-block">
+// drawCalendar() 호출 후, Deep Sleep 진입 전에 추가:
+
+esp_sleep_enable_timer_wakeup(24ULL * 3600 * 1000000);   // 타이머
+esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, LOW);            // MENU 버튼
+esp_deep_sleep_start();
+</pre>
+        <table class="pin-table">
+          <thead><tr><th>버튼</th><th>GPIO</th><th>동작</th></tr></thead>
+          <tbody>
+            <tr><td>MENU</td><td>GPIO 2</td><td>wake-up 트리거</td></tr>
+            <tr><td>다이얼 UP</td><td>GPIO 6</td><td>향후 모드 전환</td></tr>
+            <tr><td>다이얼 DOWN</td><td>GPIO 4</td><td>향후 모드 전환</td></tr>
+            <tr><td>다이얼 OK</td><td>GPIO 5</td><td>향후 선택 확인</td></tr>
+            <tr><td>EXIT</td><td>GPIO 1</td><td>향후 캘린더 복귀</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Checklist -->
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ Phase 1 완료 기준</div>
+      <ul class="checklist">
+        <li>A에 캘린더(년/월/일/요일)가 표시됨</li>
+        <li>24시간 타이머로 Deep Sleep → 재갱신 동작</li>
+        <li>MENU 버튼으로 Deep Sleep에서 깨어남</li>
+        <li>부팅 횟수가 RTC 메모리에 유지됨</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║                    PHASE 2                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="phase" id="phase2">
+  <div class="phase-header" style="background:linear-gradient(135deg, rgba(63,185,80,0.12), transparent);">
+    <div class="phase-num" style="background:var(--phase2);color:#000;">2</div>
+    <div class="phase-header-text">
+      <h2>B 기본 설정 + 센서</h2>
+      <span class="phase-meta">📅 2주 · B 보드 (Heltec WiFi LoRa V3)</span>
+    </div>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">2-1</span> Heltec V3 핀 맵 — 사용 가능 핀 확인</div>
+      <div class="step-content">
+        <p>LoRa, OLED 등이 이미 점유한 핀을 피해 자유 핀을 할당합니다.</p>
+        <table class="pin-table">
+          <thead><tr><th>점유 장치</th><th>사용 핀</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>LoRa (SX1262)</td><td>8, 9, 10, 11, 12, 13, 14</td><td class="used">점유</td></tr>
+            <tr><td>OLED (SSD1306)</td><td>17(SDA), 18(SCL), 21(RST)</td><td class="used">점유</td></tr>
+            <tr><td>Vext/LED/BATT</td><td>36, 35, 1(ADC), 37</td><td class="used">점유</td></tr>
+            <tr><td>USB/PRG</td><td>0, 19, 20</td><td class="used">점유</td></tr>
+            <tr><td colspan="2"><strong>자유 사용 가능 핀</strong></td><td class="free"><strong>FREE</strong></td></tr>
+            <tr><td colspan="2">GPIO 2, 3, 4, 5, 6, 7, 26, 33, 34, 38, 39, 40, 41, 42, 45, 46, 47, 48</td><td class="free">18개</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">2-2</span> B 핀 할당 계획</div>
+      <div class="step-content">
+        <table class="pin-table">
+          <thead><tr><th>기능</th><th>핀</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td>I2C SDA (센서)</td><td>GPIO 41</td><td>BME280 + BH1750 공유</td></tr>
+            <tr><td>I2C SCL (센서)</td><td>GPIO 42</td><td></td></tr>
+            <tr><td>PIR 센서</td><td>GPIO 2</td><td>디지털 입력</td></tr>
+            <tr><td>버튼 1</td><td>GPIO 3</td><td>재생/정지</td></tr>
+            <tr><td>버튼 2</td><td>GPIO 4</td><td>다음 채널/곡</td></tr>
+            <tr><td>버튼 3</td><td>GPIO 5</td><td>모드 변경</td></tr>
+            <tr><td>버튼 4</td><td>GPIO 6</td><td>A 화면 갱신</td></tr>
+            <tr><td>I2S BCLK</td><td>GPIO 47</td><td>MAX98357A</td></tr>
+            <tr><td>I2S LRC</td><td>GPIO 48</td><td>MAX98357A</td></tr>
+            <tr><td>I2S DOUT</td><td>GPIO 38</td><td>MAX98357A</td></tr>
+            <tr><td>A wake 신호</td><td>GPIO 26</td><td>→ A의 RTC GPIO</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">2-3</span> 센서 배선</div>
+      <div class="step-content">
+        <div class="wiring">
+BME280 (I2C):   VCC → 3V3  |  GND → GND  |  SDA → GPIO 41  |  SCL → GPIO 42
+BH1750 (I2C):   VCC → 3V3  |  GND → GND  |  SDA → GPIO 41  |  SCL → GPIO 42  (버스 공유)
+AM312  (PIR):   VCC → 3V3  |  GND → GND  |  OUT → GPIO 2
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">2-4</span> 센서 읽기 코드</div>
+      <div class="step-content">
+<pre class="code-block">
+#include &lt;Wire.h&gt;
+#include &lt;Adafruit_BME280.h&gt;
+#include &lt;BH1750.h&gt;
+
+#define I2C_SDA 41
+#define I2C_SCL 42
+#define PIR_PIN 2
+
+Adafruit_BME280 bme;
+BH1750 lightMeter;
+
+struct SensorData {
+  float temperature;
+  float humidity;
+  float pressure;
+  float lux;
+  bool  motionDetected;
+} sensorData;
+
+void initSensors() {
+  Wire.begin(I2C_SDA, I2C_SCL);
+  if (!bme.begin(0x76, &amp;Wire))
+    Serial.println("BME280 not found!");
+  if (!lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &amp;Wire))
+    Serial.println("BH1750 not found!");
+  pinMode(PIR_PIN, INPUT);
+}
+
+void readSensors() {
+  sensorData.temperature    = bme.readTemperature();
+  sensorData.humidity       = bme.readHumidity();
+  sensorData.pressure       = bme.readPressure() / 100.0F;
+  sensorData.lux            = lightMeter.readLightLevel();
+  sensorData.motionDetected = digitalRead(PIR_PIN);
+
+  Serial.printf("T:%.1f°C  H:%.0f%%  Lux:%.0f  Motion:%s\n",
+    sensorData.temperature, sensorData.humidity,
+    sensorData.lux, sensorData.motionDetected ? "YES" : "NO");
+}
+
+void setup() {
+  Serial.begin(115200);
+  initSensors();
+}
+
+void loop() {
+  readSensors();
+  delay(5000);
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">2-5</span> 4버튼 인터럽트 처리</div>
+      <div class="step-content">
+<pre class="code-block">
+#define BTN1 3    // 재생/정지
+#define BTN2 4    // 다음
+#define BTN3 5    // 모드
+#define BTN4 6    // A 갱신
+
+volatile bool btn1Flag = false, btn2Flag = false,
+              btn3Flag = false, btn4Flag = false;
+
+void IRAM_ATTR onBtn1() { btn1Flag = true; }
+void IRAM_ATTR onBtn2() { btn2Flag = true; }
+void IRAM_ATTR onBtn3() { btn3Flag = true; }
+void IRAM_ATTR onBtn4() { btn4Flag = true; }
+
+void initButtons() {
+  int pins[] = {BTN1, BTN2, BTN3, BTN4};
+  void (*isrs[])() = {onBtn1, onBtn2, onBtn3, onBtn4};
+  for (int i = 0; i &lt; 4; i++) {
+    pinMode(pins[i], INPUT_PULLUP);
+    attachInterrupt(pins[i], isrs[i], FALLING);
+  }
+}
+
+void handleButtons() {
+  if (btn1Flag) { btn1Flag = false; Serial.println("BTN1: Play/Pause"); }
+  if (btn2Flag) { btn2Flag = false; Serial.println("BTN2: Next"); }
+  if (btn3Flag) { btn3Flag = false; Serial.println("BTN3: Mode"); }
+  if (btn4Flag) { btn4Flag = false; Serial.println("BTN4: Refresh A"); }
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">2-6</span> OLED 상태 표시</div>
+      <div class="step-content">
+        <p>Heltec V3의 내장 0.96" OLED(SSD1306)에 실시간 센서 값을 표시합니다.</p>
+<pre class="code-block">
+#include &lt;heltec.h&gt;
+
+void updateOLED() {
+  Heltec.display-&gt;clear();
+  Heltec.display-&gt;setFont(ArialMT_Plain_10);
+  Heltec.display-&gt;drawString(0,  0, "T: " + String(sensorData.temperature,1) + " C");
+  Heltec.display-&gt;drawString(0, 12, "H: " + String(sensorData.humidity,0) + " %");
+  Heltec.display-&gt;drawString(0, 24, "Lux: " + String(sensorData.lux,0));
+  Heltec.display-&gt;drawString(0, 36, "Motion: " +
+    String(sensorData.motionDetected ? "YES" : "NO"));
+  Heltec.display-&gt;drawString(0, 48, "Mode: Smart");
+  Heltec.display-&gt;display();
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ Phase 2 완료 기준</div>
+      <ul class="checklist">
+        <li>B에서 온도/습도/조도/PIR 읽기 성공</li>
+        <li>4개 버튼이 인터럽트로 반응</li>
+        <li>OLED에 센서 데이터 실시간 표시</li>
+        <li>시리얼 모니터에 데이터 출력 확인</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║                    PHASE 3                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="phase" id="phase3">
+  <div class="phase-header" style="background:linear-gradient(135deg, rgba(210,153,34,0.12), transparent);">
+    <div class="phase-num" style="background:var(--phase3);color:#000;">3</div>
+    <div class="phase-header-text">
+      <h2>A↔B 통신 + 절전 모드</h2>
+      <span class="phase-meta">📅 2주 · 양쪽 보드 · ESP-NOW + GPIO Wake</span>
+    </div>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">3-1</span> 공통 메시지 구조 (shared_types.h)</div>
+      <div class="step-content">
+        <p>A와 B 양쪽 프로젝트에 동일한 헤더 파일을 사용합니다.</p>
+<pre class="code-block">
+#pragma once
+#include &lt;stdint.h&gt;
+
+enum MsgType : uint8_t {
+  // B → A
+  MSG_CALENDAR = 0x01,  MSG_MUSIC   = 0x02,
+  MSG_WEATHER  = 0x03,  MSG_NEWS    = 0x04,
+  MSG_SENSOR   = 0x05,  MSG_PRESET  = 0x10,
+  MSG_TIME_SYNC = 0x11,
+  // A → B
+  MSG_BUTTON   = 0x20,  MSG_REQUEST = 0x21,
+  MSG_ACK      = 0xFF
+};
+
+typedef struct { MsgType type; uint8_t id; } MsgHeader;
+
+typedef struct {
+  MsgHeader header;
+  int year, month, day, hour, minute;
+} CalendarMsg;
+
+typedef struct {
+  MsgHeader header;
+  char title[64];  char artist[48];
+  bool isPlaying;  uint16_t progressPct;
+} MusicMsg;
+
+typedef struct {
+  MsgHeader header;
+  int8_t temp, tempHigh, tempLow;
+  uint8_t humidity, icon;
+  char desc[32];
+} WeatherMsg;
+
+typedef struct {
+  MsgHeader header;
+  float temperature, humidity, lux;
+  bool motion;
+} SensorMsg;
+
+typedef struct { MsgHeader header; uint8_t preset; } PresetMsg;
+typedef struct { MsgHeader header; uint8_t buttonId; } ButtonMsg;
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">3-2</span> 유선 Wake-up 배선</div>
+      <div class="step-content">
+        <div class="wiring">
+물리 연결 (점퍼 와이어 2개):
+  B (GPIO 26) ──────────── A (GPIO 3)
+  B (GND)     ──────────── A (GND)
+
+A 측: GPIO 3에 10KΩ 풀다운 저항 (GPIO3 → GND)
+→ 평소 LOW 유지, B가 HIGH 보내면 A wake
+        </div>
+        <div class="alert alert-info">
+          <div class="alert-title">💡 왜 GPIO 3인가?</div>
+          <p>ESP32-S3의 RTC GPIO 범위는 0~21입니다. CrowPanel에서 GPIO 3은 GPIO 확장 포트로 접근 가능하며, 버튼과 겹치지 않습니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">3-3</span> B 측: ESP-NOW 송신 코드</div>
+      <div class="step-content">
+<pre class="code-block">
+#include &lt;esp_now.h&gt;
+#include &lt;WiFi.h&gt;
+#include "shared_types.h"
+
+#define WAKE_PIN 26
+
+// ★ A의 MAC 주소 (A 시리얼 모니터에서 WiFi.macAddress() 로 확인)
+uint8_t peerA[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+
+void initESPNOW_B() {
+  WiFi.mode(WIFI_STA);
+  esp_now_init();
+  esp_now_peer_info_t pi = {};
+  memcpy(pi.peer_addr, peerA, 6);
+  pi.channel = 0;  pi.encrypt = false;
+  esp_now_add_peer(&amp;pi);
+}
+
+void wakeA() {
+  pinMode(WAKE_PIN, OUTPUT);
+  digitalWrite(WAKE_PIN, HIGH);
+  delay(10);
+  digitalWrite(WAKE_PIN, LOW);
+  delay(500);   // A 부팅 대기
+}
+
+void sendSensorToA() {
+  wakeA();
+  SensorMsg msg;
+  msg.header = { MSG_SENSOR, (uint8_t)(millis() &amp; 0xFF) };
+  msg.temperature = sensorData.temperature;
+  msg.humidity    = sensorData.humidity;
+  msg.lux         = sensorData.lux;
+  msg.motion      = sensorData.motionDetected;
+  esp_now_send(peerA, (uint8_t*)&amp;msg, sizeof(msg));
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">3-4</span> A 측: ESP-NOW 수신 + 절전 프리셋</div>
+      <div class="step-content">
+<pre class="code-block">
+#include &lt;esp_now.h&gt;
+#include &lt;WiFi.h&gt;
+#include "shared_types.h"
+
+#define WIRE_WAKE 3     // B에서 들어오는 wake 신호
+
+RTC_DATA_ATTR uint8_t currentPreset = 1;   // 기본: 스마트
+volatile bool dataReceived = false;
+uint8_t recvBuf[256];
+int recvLen = 0;
+
+void onRecv(const uint8_t* mac, const uint8_t* data, int len) {
+  memcpy(recvBuf, data, len);
+  recvLen = len;
+  dataReceived = true;
+}
+
+void initESPNOW_A() {
+  WiFi.mode(WIFI_STA);
+  esp_now_init();
+  esp_now_register_recv_cb(onRecv);
+  // B를 peer로 등록
+  uint8_t peerB[] = {0x11,0x22,0x33,0x44,0x55,0x66};
+  esp_now_peer_info_t pi = {};
+  memcpy(pi.peer_addr, peerB, 6);
+  esp_now_add_peer(&amp;pi);
+}
+
+void waitForData(uint32_t ms) {
+  unsigned long t = millis();
+  while (!dataReceived &amp;&amp; millis() - t &lt; ms) delay(10);
+}
+
+void processData() {
+  MsgHeader* h = (MsgHeader*)recvBuf;
+  switch (h-&gt;type) {
+    case MSG_CALENDAR: {
+      CalendarMsg* m = (CalendarMsg*)recvBuf;
+      savedYear = m-&gt;year; savedMonth = m-&gt;month; savedDay = m-&gt;day;
+      drawCalendar();
+      break;
+    }
+    case MSG_SENSOR: {
+      SensorMsg* m = (SensorMsg*)recvBuf;
+      drawSensorScreen(m-&gt;temperature, m-&gt;humidity, m-&gt;lux);
+      break;
+    }
+    case MSG_WEATHER: {
+      WeatherMsg* m = (WeatherMsg*)recvBuf;
+      drawWeatherScreen(m-&gt;temp, m-&gt;humidity, m-&gt;desc);
+      break;
+    }
+    case MSG_MUSIC: {
+      MusicMsg* m = (MusicMsg*)recvBuf;
+      drawMusicScreen(m-&gt;title, m-&gt;artist, m-&gt;isPlaying);
+      break;
+    }
+    case MSG_PRESET: {
+      PresetMsg* m = (PresetMsg*)recvBuf;
+      currentPreset = m-&gt;preset;
+      break;
+    }
+  }
+}
+
+<strong>// ★ 4단계 절전 프리셋</strong>
+void enterSleep() {
+  esp_now_deinit();
+  WiFi.mode(WIFI_OFF);
+  display.hibernate();
+  epdPower(false);
+
+  switch (currentPreset) {
+    case 0:  // 액자 — 24시간
+      esp_sleep_enable_timer_wakeup(24ULL * 3600 * 1000000);  break;
+    case 1:  // 스마트 — 5분
+      esp_sleep_enable_timer_wakeup(5ULL * 60 * 1000000);     break;
+    case 2:  // 뮤직 — 30초
+      esp_sleep_enable_timer_wakeup(30ULL * 1000000);          break;
+    case 3:  // 라이브 — 5초
+      esp_sleep_enable_timer_wakeup(5ULL * 1000000);           break;
+  }
+  // 유선 wake (B → A)
+  esp_sleep_enable_ext1_wakeup(
+    (1ULL &lt;&lt; WIRE_WAKE), ESP_EXT1_WAKEUP_ANY_HIGH);
+  // 버튼 wake
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, LOW);
+
+  esp_deep_sleep_start();
+}
+
+void setup() {
+  bootCount++;
+  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+
+  initESPNOW_A();
+
+  switch (cause) {
+    case ESP_SLEEP_WAKEUP_TIMER:
+      sendRequestToB();
+      waitForData(2000);
+      if (dataReceived) processData(); else drawCalendar();
+      break;
+    case ESP_SLEEP_WAKEUP_EXT1:   // B의 GPIO 신호
+      waitForData(3000);
+      if (dataReceived) processData();
+      break;
+    case ESP_SLEEP_WAKEUP_EXT0:   // 사용자 버튼
+      handleButtonMenu();
+      break;
+    default:
+      drawCalendar();
+      break;
+  }
+  enterSleep();
+}
+
+void loop() {}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">3-5</span> 절전 프리셋 요약</div>
+      <div class="step-content">
+        <table class="pin-table">
+          <thead><tr><th>프리셋</th><th>이름</th><th>Sleep 모드</th><th>폴링 주기</th><th>유선 응답</th><th>배터리 (1500mAh)</th></tr></thead>
+          <tbody>
+            <tr><td><strong>0</strong></td><td>액자</td><td>Hibernation</td><td>24시간</td><td>즉시</td><td>~2년</td></tr>
+            <tr><td><strong>1</strong></td><td>스마트</td><td>Deep Sleep</td><td>5분</td><td>즉시</td><td>3~6개월</td></tr>
+            <tr><td><strong>2</strong></td><td>뮤직</td><td>Deep Sleep</td><td>30초</td><td>즉시</td><td>1~2주</td></tr>
+            <tr><td><strong>3</strong></td><td>라이브</td><td>Deep Sleep</td><td>5초</td><td>즉시</td><td>1~3일</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ Phase 3 완료 기준</div>
+      <ul class="checklist">
+        <li>B → A ESP-NOW 메시지 송수신 성공</li>
+        <li>B의 GPIO 신호로 A가 Deep Sleep에서 즉시 깨어남</li>
+        <li>센서 데이터가 A 화면에 표시됨</li>
+        <li>4단계 절전 프리셋 전환 동작 확인</li>
+        <li>A의 버튼 이벤트가 B에 전달됨</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║                    PHASE 4                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="phase" id="phase4">
+  <div class="phase-header" style="background:linear-gradient(135deg, rgba(244,112,103,0.12), transparent);">
+    <div class="phase-num" style="background:var(--phase4);color:#000;">4</div>
+    <div class="phase-header-text">
+      <h2>WiFi API 연동</h2>
+      <span class="phase-meta">📅 2주 · B 보드 · NTP · 날씨 · OpenAI · Spotify</span>
+    </div>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">4-1</span> WiFi 연결 + NTP 시간 동기화</div>
+      <div class="step-content">
+<pre class="code-block">
+#include &lt;WiFi.h&gt;
+#include &lt;time.h&gt;
+
+const char* ssid     = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASS";
+
+void connectWiFi() {
+  WiFi.begin(ssid, password);
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED &amp;&amp; tries &lt; 20) {
+    delay(500); tries++;
+  }
+  Serial.println("WiFi: " + WiFi.localIP().toString());
+}
+
+void syncNTP() {
+  configTime(9 * 3600, 0, "pool.ntp.org");   // KST (UTC+9)
+  struct tm ti;
+  if (getLocalTime(&amp;ti))
+    Serial.printf("NTP: %04d-%02d-%02d %02d:%02d\n",
+      ti.tm_year+1900, ti.tm_mon+1, ti.tm_mday, ti.tm_hour, ti.tm_min);
+}
+
+void sendTimeToA() {
+  struct tm ti;  getLocalTime(&amp;ti);
+  CalendarMsg msg;
+  msg.header = { MSG_CALENDAR, 0 };
+  msg.year = ti.tm_year+1900; msg.month = ti.tm_mon+1;
+  msg.day  = ti.tm_mday;      msg.hour  = ti.tm_hour;
+  msg.minute = ti.tm_min;
+  wakeA();
+  esp_now_send(peerA, (uint8_t*)&amp;msg, sizeof(msg));
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">4-2</span> 날씨 API (OpenWeatherMap)</div>
+      <div class="step-content">
+        <p>무료 API 키는 <a href="https://openweathermap.org/api" style="color:var(--accent)">openweathermap.org</a>에서 발급받습니다.</p>
+<pre class="code-block">
+#include &lt;HTTPClient.h&gt;
+#include &lt;ArduinoJson.h&gt;
+
+const char* weatherKey = "YOUR_API_KEY";
+const char* city = "Seoul";
+
+void fetchWeather() {
+  HTTPClient http;
+  String url = "http://api.openweathermap.org/data/2.5/weather?q="
+    + String(city) + "&amp;appid=" + weatherKey + "&amp;units=metric&amp;lang=kr";
+
+  http.begin(url);
+  if (http.GET() == 200) {
+    JsonDocument doc;
+    deserializeJson(doc, http.getString());
+
+    WeatherMsg msg;
+    msg.header   = { MSG_WEATHER, 0 };
+    msg.temp     = (int8_t)doc["main"]["temp"].as&lt;float&gt;();
+    msg.tempHigh = (int8_t)doc["main"]["temp_max"].as&lt;float&gt;();
+    msg.tempLow  = (int8_t)doc["main"]["temp_min"].as&lt;float&gt;();
+    msg.humidity = doc["main"]["humidity"];
+    String d = doc["weather"][0]["description"].as&lt;String&gt;();
+    strncpy(msg.desc, d.c_str(), sizeof(msg.desc)-1);
+
+    wakeA();
+    esp_now_send(peerA, (uint8_t*)&amp;msg, sizeof(msg));
+  }
+  http.end();
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">4-3</span> OpenAI API — 뉴스 요약</div>
+      <div class="step-content">
+<pre class="code-block">
+void fetchNewsSummary() {
+  HTTPClient http;
+  http.begin("https://api.openai.com/v1/chat/completions");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer YOUR_OPENAI_KEY");
+
+  String body = "{\"model\":\"gpt-4o-mini\","
+    "\"messages\":[{\"role\":\"user\","
+    "\"content\":\"Today's top 3 news in Korean, each under 20 chars."
+    " Format: {\\\"h\\\":[\\\"a\\\",\\\"b\\\",\\\"c\\\"]}\"}],"
+    "\"max_tokens\":150}";
+
+  if (http.POST(body) == 200) {
+    JsonDocument doc;
+    deserializeJson(doc, http.getString());
+    String content = doc["choices"][0]["message"]["content"].as&lt;String&gt;();
+    // 파싱 후 A에 전송 ...
+  }
+  http.end();
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">4-4</span> Spotify API — 리모컨 + 현재 곡 정보</div>
+      <div class="step-content">
+        <div class="alert alert-warn">
+          <div class="alert-title">⚠️ Spotify Premium 필요</div>
+          <p>재생 제어(play/pause/skip) API는 Premium 계정 전용입니다. 사전에 OAuth 2.0 refresh_token을 발급받아야 합니다.</p>
+        </div>
+<pre class="code-block">
+String spotifyToken = "";
+String refreshToken = "YOUR_REFRESH_TOKEN";
+
+void refreshSpotifyToken() {
+  HTTPClient http;
+  http.begin("https://accounts.spotify.com/api/token");
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  String body = "grant_type=refresh_token&amp;refresh_token=" + refreshToken
+    + "&amp;client_id=YOUR_ID&amp;client_secret=YOUR_SECRET";
+  if (http.POST(body) == 200) {
+    JsonDocument doc; deserializeJson(doc, http.getString());
+    spotifyToken = doc["access_token"].as&lt;String&gt;();
+  }
+  http.end();
+}
+
+void getSpotifyNowPlaying() {
+  HTTPClient http;
+  http.begin("https://api.spotify.com/v1/me/player/currently-playing");
+  http.addHeader("Authorization", "Bearer " + spotifyToken);
+  int code = http.GET();
+  if (code == 200) {
+    JsonDocument doc; deserializeJson(doc, http.getString());
+    MusicMsg msg;
+    msg.header = { MSG_MUSIC, 0 };
+    msg.isPlaying = doc["is_playing"];
+    msg.progressPct = (uint16_t)(
+      doc["progress_ms"].as&lt;float&gt;() /
+      doc["item"]["duration_ms"].as&lt;float&gt;() * 1000);
+    strncpy(msg.title,  doc["item"]["name"]                 | "", 63);
+    strncpy(msg.artist, doc["item"]["artists"][0]["name"]   | "", 47);
+    wakeA();
+    esp_now_send(peerA, (uint8_t*)&amp;msg, sizeof(msg));
+  } else if (code == 401) {
+    refreshSpotifyToken();
+  }
+  http.end();
+}
+
+// 재생 제어
+void spotifyPause() {
+  HTTPClient h; h.begin("https://api.spotify.com/v1/me/player/pause");
+  h.addHeader("Authorization","Bearer "+spotifyToken); h.PUT(""); h.end();
+}
+void spotifyNext() {
+  HTTPClient h; h.begin("https://api.spotify.com/v1/me/player/next");
+  h.addHeader("Authorization","Bearer "+spotifyToken); h.POST(""); h.end();
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ Phase 4 완료 기준</div>
+      <ul class="checklist">
+        <li>B가 WiFi에 연결, NTP로 시간 동기화 성공</li>
+        <li>날씨 데이터 → A E-Paper에 표시</li>
+        <li>OpenAI 뉴스 요약 → A에 표시</li>
+        <li>Spotify 현재 곡 정보 → A에 표시</li>
+        <li>B 버튼으로 Spotify 재생/정지/스킵 동작</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║                    PHASE 5                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="phase" id="phase5">
+  <div class="phase-header" style="background:linear-gradient(135deg, rgba(188,140,255,0.12), transparent);">
+    <div class="phase-num" style="background:var(--phase5);color:#000;">5</div>
+    <div class="phase-header-text">
+      <h2>I2S 오디오 출력</h2>
+      <span class="phase-meta">📅 2주 · B 보드 · MAX98357A · 인터넷 라디오</span>
+    </div>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">5-1</span> MAX98357A 배선</div>
+      <div class="step-content">
+        <div class="wiring">
+MAX98357A I2S 앰프 모듈:
+  VIN  → Heltec 3V3 (또는 5V)
+  GND  → GND
+  BCLK → GPIO 47
+  LRC  → GPIO 48
+  DIN  → GPIO 38
+  SD   → 연결 안 함 (또는 VIN에 풀업 = L+R 합산)
+
+스피커:
+  + → MAX98357A (+)
+  - → MAX98357A (-)
+        </div>
+        <div class="alert alert-info">
+          <div class="alert-title">💡 PSRAM 없음 주의</div>
+          <p>Heltec V3에는 PSRAM이 없습니다. 오디오 버퍼를 작게 유지하고, 낮은 비트레이트 스트림(64~128kbps)을 사용하세요.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">5-2</span> 인터넷 라디오 스트리밍</div>
+      <div class="step-content">
+        <p>ESP8266Audio 라이브러리를 사용합니다. (Library Manager에서 설치)</p>
+<pre class="code-block">
+#include "AudioGeneratorMP3.h"
+#include "AudioOutputI2S.h"
+#include "AudioFileSourceHTTPStream.h"
+#include "AudioFileSourceBuffer.h"
+
+AudioGeneratorMP3        *mp3      = nullptr;
+AudioOutputI2S           *audioOut = nullptr;
+AudioFileSourceHTTPStream *stream  = nullptr;
+AudioFileSourceBuffer    *buff     = nullptr;
+
+const char* radioStations[] = {
+  "http://stream.live.vc.bbcmedia.co.uk/bbc_radio_one",
+  "http://ice1.somafm.com/groovesalad-128-mp3",
+  "http://streams.kqed.org/kqedradio"
+};
+int numStations = 3;
+int currentStation = 0;
+
+void initAudio() {
+  audioOut = new AudioOutputI2S();
+  audioOut-&gt;SetPinout(47, 48, 38);  // BCLK, LRC, DOUT
+  audioOut-&gt;SetGain(0.3);
+}
+
+void playRadio(int idx) {
+  stopRadio();
+  currentStation = idx % numStations;
+  stream = new AudioFileSourceHTTPStream(radioStations[currentStation]);
+  buff   = new AudioFileSourceBuffer(stream, 2048);  // 작은 버퍼
+  mp3    = new AudioGeneratorMP3();
+  mp3-&gt;begin(buff, audioOut);
+  Serial.printf("Playing station %d\n", currentStation);
+}
+
+void stopRadio() {
+  if (mp3 &amp;&amp; mp3-&gt;isRunning()) mp3-&gt;stop();
+  delete mp3;    mp3    = nullptr;
+  delete buff;   buff   = nullptr;
+  delete stream; stream = nullptr;
+}
+
+void nextStation() {
+  playRadio(currentStation + 1);
+}
+
+// ★ loop() 또는 FreeRTOS 태스크에서 반복 호출 필수
+void audioLoop() {
+  if (mp3 &amp;&amp; mp3-&gt;isRunning()) {
+    if (!mp3-&gt;loop()) {
+      mp3-&gt;stop();
+      Serial.println("Stream ended");
+    }
+  }
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">5-3</span> 알림음 재생 (WAV 파일)</div>
+      <div class="step-content">
+<pre class="code-block">
+#include "AudioGeneratorWAV.h"
+#include "AudioFileSourceSPIFFS.h"
+// SPIFFS에 notification.wav 업로드 필요
+
+void playNotification(const char* filename) {
+  AudioFileSourceSPIFFS *file = new AudioFileSourceSPIFFS(filename);
+  AudioGeneratorWAV *wav = new AudioGeneratorWAV();
+  wav-&gt;begin(file, audioOut);
+  while (wav-&gt;isRunning()) {
+    if (!wav-&gt;loop()) wav-&gt;stop();
+  }
+  delete wav;  delete file;
+}
+
+// 사용: playNotification("/notification.wav");
+</pre>
+      </div>
+    </div>
+
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ Phase 5 완료 기준</div>
+      <ul class="checklist">
+        <li>MAX98357A + 스피커에서 사운드 출력됨</li>
+        <li>인터넷 라디오 스트림 재생 성공</li>
+        <li>B 버튼으로 채널 전환 동작</li>
+        <li>SPIFFS의 WAV 알림음 재생 가능</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║                    PHASE 6                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="phase" id="phase6">
+  <div class="phase-header" style="background:linear-gradient(135deg, rgba(247,120,186,0.12), transparent);">
+    <div class="phase-num" style="background:var(--phase6);color:#000;">6</div>
+    <div class="phase-header-text">
+      <h2>스마트폰 연동</h2>
+      <span class="phase-meta">📅 1주 · B 보드 · WebServer API</span>
+    </div>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">6-1</span> B: WebServer 엔드포인트</div>
+      <div class="step-content">
+        <p>B가 WiFi WebServer를 운영합니다. 폰 브라우저에서 <code class="inline">http://B의IP/status</code> 등으로 접속합니다.</p>
+<pre class="code-block">
+#include &lt;WebServer.h&gt;
+WebServer server(80);
+
+void initWebServer() {
+
+  // ── 상태 확인 ──
+  server.on("/status", HTTP_GET, []() {
+    JsonDocument doc;
+    doc["temp"]     = sensorData.temperature;
+    doc["humidity"] = sensorData.humidity;
+    doc["lux"]      = sensorData.lux;
+    doc["motion"]   = sensorData.motionDetected;
+    doc["preset"]   = currentPreset;
+    doc["radio"]    = (mp3 &amp;&amp; mp3-&gt;isRunning());
+    doc["station"]  = currentStation;
+    String json; serializeJson(doc, json);
+    server.send(200, "application/json", json);
+  });
+
+  // ── A 화면 모드 변경 ──
+  server.on("/display/mode", HTTP_POST, []() {
+    String mode = server.arg("mode");
+    if      (mode == "calendar") sendTimeToA();
+    else if (mode == "weather")  fetchWeather();
+    else if (mode == "music")    getSpotifyNowPlaying();
+    else if (mode == "news")     fetchNewsSummary();
+    server.send(200, "text/plain", "OK");
+  });
+
+  // ── 절전 프리셋 변경 ──
+  server.on("/power/preset", HTTP_POST, []() {
+    uint8_t p = server.arg("preset").toInt();
+    PresetMsg msg = {{ MSG_PRESET, 0 }, p};
+    wakeA();
+    esp_now_send(peerA, (uint8_t*)&amp;msg, sizeof(msg));
+    currentPreset = p;
+    server.send(200, "text/plain", "OK");
+  });
+
+  // ── 라디오 제어 ──
+  server.on("/radio/play", HTTP_POST, []() {
+    int s = server.arg("station").toInt();
+    playRadio(s);
+    server.send(200, "text/plain", "Playing");
+  });
+  server.on("/radio/stop", HTTP_POST, []() {
+    stopRadio();
+    server.send(200, "text/plain", "Stopped");
+  });
+
+  // ── Spotify 제어 ──
+  server.on("/spotify/pause", HTTP_POST, []() {
+    spotifyPause();
+    server.send(200, "text/plain", "OK");
+  });
+  server.on("/spotify/next", HTTP_POST, []() {
+    spotifyNext();
+    server.send(200, "text/plain", "OK");
+  });
+
+  server.begin();
+  Serial.println("WebServer: http://" + WiFi.localIP().toString());
+}
+</pre>
+        <table class="pin-table">
+          <thead><tr><th>엔드포인트</th><th>메서드</th><th>기능</th></tr></thead>
+          <tbody>
+            <tr><td><code class="inline">/status</code></td><td>GET</td><td>센서, 모드, 라디오 상태</td></tr>
+            <tr><td><code class="inline">/display/mode</code></td><td>POST</td><td>A 화면 모드 변경</td></tr>
+            <tr><td><code class="inline">/power/preset</code></td><td>POST</td><td>절전 프리셋 변경</td></tr>
+            <tr><td><code class="inline">/radio/play</code></td><td>POST</td><td>라디오 재생</td></tr>
+            <tr><td><code class="inline">/radio/stop</code></td><td>POST</td><td>라디오 정지</td></tr>
+            <tr><td><code class="inline">/spotify/pause</code></td><td>POST</td><td>Spotify 일시정지</td></tr>
+            <tr><td><code class="inline">/spotify/next</code></td><td>POST</td><td>Spotify 다음 곡</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ Phase 6 완료 기준</div>
+      <ul class="checklist">
+        <li>폰 브라우저에서 B 상태 JSON 확인</li>
+        <li>폰에서 A 화면 모드 전환 성공</li>
+        <li>폰에서 라디오 재생/정지 제어</li>
+        <li>폰에서 절전 프리셋 변경 반영</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║                    PHASE 7                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="phase" id="phase7">
+  <div class="phase-header" style="background:linear-gradient(135deg, rgba(121,192,255,0.12), transparent);">
+    <div class="phase-num" style="background:var(--phase7);color:#000;">7</div>
+    <div class="phase-header-text">
+      <h2>통합 + 자동화</h2>
+      <span class="phase-meta">📅 2주 · 양쪽 보드 · FreeRTOS · 자동 모드 전환</span>
+    </div>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">7-1</span> B 메인 코드 — FreeRTOS 태스크 분리</div>
+      <div class="step-content">
+<pre class="code-block">
+void taskSensor(void* p) {
+  for (;;) {
+    readSensors();
+    updateOLED();
+    handleButtons();
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+void taskWebServer(void* p) {
+  for (;;) {
+    server.handleClient();
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+void taskAudio(void* p) {
+  for (;;) {
+    audioLoop();
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  connectWiFi();   syncNTP();
+  initESPNOW_B();  initSensors();
+  initButtons();   initAudio();
+  initWebServer();
+
+  //       태스크명      함수           스택    우선순위  코어
+  xTaskCreatePinnedToCore(taskSensor,    "sns",  4096,  NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(taskWebServer, "web",  8192,  NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(taskAudio,     "aud",  8192,  NULL, 2, NULL, 1);
+  // Core 0: 센서, 웹서버, ESP-NOW
+  // Core 1: 오디오 (전용)
+}
+
+void loop() {
+  autoScheduler();
+  autoModeCheck();
+  delay(100);
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">7-2</span> 자동 스케줄러</div>
+      <div class="step-content">
+<pre class="code-block">
+void autoScheduler() {
+  static unsigned long lastWeather = 0, lastSpotify = 0, lastNTP = 0;
+  unsigned long now = millis();
+
+  // 30분마다 날씨 갱신 → A에 전송
+  if (now - lastWeather &gt; 30UL * 60 * 1000) {
+    fetchWeather();  lastWeather = now;
+  }
+  // 뮤직 모드일 때 30초마다 Spotify 확인
+  if (currentPreset == 2 &amp;&amp; now - lastSpotify &gt; 30000) {
+    getSpotifyNowPlaying();  lastSpotify = now;
+  }
+  // 6시간마다 NTP 재동기화
+  if (now - lastNTP &gt; 6UL * 3600 * 1000) {
+    syncNTP();  sendTimeToA();  lastNTP = now;
+  }
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">7-3</span> 자동 모드 전환 로직</div>
+      <div class="step-content">
+<pre class="code-block">
+void autoModeCheck() {
+  struct tm ti;  getLocalTime(&amp;ti);
+
+  // 야간 (23시~6시) + PIR 미감지 → 액자
+  if ((ti.tm_hour &gt;= 23 || ti.tm_hour &lt; 6)
+      &amp;&amp; !sensorData.motionDetected
+      &amp;&amp; currentPreset != 0) {
+    sendPresetToA(0);  currentPreset = 0;
+  }
+
+  // 라디오 재생 중 → 뮤직 모드
+  bool playing = mp3 &amp;&amp; mp3-&gt;isRunning();
+  static unsigned long stoppedAt = 0;
+
+  if (playing &amp;&amp; currentPreset != 2) {
+    sendPresetToA(2);  currentPreset = 2;  stoppedAt = 0;
+  }
+
+  // 라디오 종료 10분 후 → 스마트 모드 복귀
+  if (!playing &amp;&amp; currentPreset == 2) {
+    if (stoppedAt == 0) stoppedAt = millis();
+    if (millis() - stoppedAt &gt; 10UL * 60 * 1000) {
+      sendPresetToA(1);  currentPreset = 1;  stoppedAt = 0;
+    }
+  }
+}
+
+void sendPresetToA(uint8_t p) {
+  PresetMsg msg = {{ MSG_PRESET, 0 }, p};
+  wakeA();
+  esp_now_send(peerA, (uint8_t*)&amp;msg, sizeof(msg));
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ Phase 7 완료 기준</div>
+      <ul class="checklist">
+        <li>B가 센서+API+오디오+웹서버를 동시 운용</li>
+        <li>야간 자동 → 액자 모드 전환 동작</li>
+        <li>라디오 재생 시 자동 → 뮤직 모드 전환</li>
+        <li>A가 모든 화면 모드 정상 표시</li>
+        <li>24시간 연속 동작 안정성 확인</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║                    PHASE 8                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="phase" id="phase8">
+  <div class="phase-header" style="background:linear-gradient(135deg, rgba(86,211,100,0.12), transparent);">
+    <div class="phase-num" style="background:var(--phase8);color:#000;">8</div>
+    <div class="phase-header-text">
+      <h2>최적화 + 마무리</h2>
+      <span class="phase-meta">📅 2주 · 양쪽 보드 · 안정화 · 전력 최적화</span>
+    </div>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">8-1</span> A 배터리 최적화</div>
+      <div class="step-content">
+<pre class="code-block">
+// 불필요한 GPIO를 isolate하여 누설 전류 제거
+#include "driver/rtc_io.h"
+
+void optimizeSleep() {
+  // 사용하지 않는 RTC GPIO를 격리
+  rtc_gpio_isolate(GPIO_NUM_0);
+  rtc_gpio_isolate(GPIO_NUM_4);
+  // ... 필요에 따라 추가
+
+  // E-Paper 전원 확실히 차단
+  epdPower(false);
+
+  // WiFi 완전 종료
+  esp_now_deinit();
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  esp_wifi_stop();
+  esp_wifi_deinit();
+}
+</pre>
+        <p>실측 전류를 멀티미터로 확인합니다. 목표: 배터리 모드에서 <strong>15~25µA</strong>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">8-2</span> ESP-NOW 안정성 — 재전송 로직</div>
+      <div class="step-content">
+<pre class="code-block">
+bool sendWithRetry(const uint8_t* peer, const uint8_t* data,
+                   size_t len, int maxRetries = 3) {
+  for (int i = 0; i &lt; maxRetries; i++) {
+    esp_err_t result = esp_now_send(peer, data, len);
+    if (result == ESP_OK) return true;
+    delay(50 * (i + 1));  // 점진적 대기
+  }
+  Serial.println("ESP-NOW send failed after retries");
+  return false;
+}
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">8-3</span> WiFi 채널 고정</div>
+      <div class="step-content">
+        <p>ESP-NOW와 WiFi가 같은 채널을 사용해야 동시 동작이 안정적입니다.</p>
+<pre class="code-block">
+// B 측: WiFi 연결 후 채널 확인
+int ch = WiFi.channel();
+Serial.printf("WiFi channel: %d\n", ch);
+
+// A 측: peer 등록 시 같은 채널 지정
+esp_now_peer_info_t pi = {};
+memcpy(pi.peer_addr, peerB, 6);
+pi.channel = ch;   // B의 WiFi 채널과 동일하게
+esp_now_add_peer(&amp;pi);
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">8-4</span> OTA 무선 펌웨어 업데이트 (B)</div>
+      <div class="step-content">
+<pre class="code-block">
+#include &lt;ArduinoOTA.h&gt;
+
+void initOTA() {
+  ArduinoOTA.setHostname("dualcore-hub");
+  ArduinoOTA.setPassword("your_ota_password");
+  ArduinoOTA.begin();
+}
+
+// loop()에서 호출:
+ArduinoOTA.handle();
+</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title"><span class="step-num">8-5</span> 최종 체크리스트</div>
+      <div class="step-content">
+        <table class="pin-table">
+          <thead><tr><th>항목</th><th>확인 사항</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>A Deep Sleep 전류</td><td>15~25µA 이내인지 멀티미터 확인</td><td>☐</td></tr>
+            <tr><td>A 배터리 수명</td><td>프리셋별 예상 vs 실측 비교</td><td>☐</td></tr>
+            <tr><td>ESP-NOW 성공률</td><td>100회 전송 중 실패 횟수 &lt; 3</td><td>☐</td></tr>
+            <tr><td>GPIO wake 반응 시간</td><td>B 신호 → A 화면 갱신까지 &lt; 3초</td><td>☐</td></tr>
+            <tr><td>WiFi 재연결</td><td>라우터 재부팅 후 자동 복구 확인</td><td>☐</td></tr>
+            <tr><td>API 실패 처리</td><td>서버 오류 시 이전 데이터 유지</td><td>☐</td></tr>
+            <tr><td>오디오 안정성</td><td>라디오 1시간 연속 재생 끊김 없음</td><td>☐</td></tr>
+            <tr><td>자동 모드 전환</td><td>야간/라디오 시나리오 정상 동작</td><td>☐</td></tr>
+            <tr><td>폰 연동</td><td>모든 엔드포인트 응답 정상</td><td>☐</td></tr>
+            <tr><td>24시간 스트레스 테스트</td><td>크래시/메모리 릭 없음</td><td>☐</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="alert alert-ok">
+      <div class="alert-title">✅ Phase 8 완료 기준</div>
+      <ul class="checklist">
+        <li>A Deep Sleep 실측 전류 25µA 이내</li>
+        <li>ESP-NOW 재전송 로직으로 통신 안정화</li>
+        <li>WiFi 채널 고정으로 ESP-NOW/WiFi 공존 확인</li>
+        <li>OTA 업데이트 동작</li>
+        <li>24시간 연속 동작 크래시 없음</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════ SUMMARY ════════════════════ -->
+<div class="arch-box">
+  <h2>📊 전체 로드맵 요약</h2>
+  <table class="bom-table">
+    <thead><tr><th>Phase</th><th>내용</th><th>보드</th><th>기간</th></tr></thead>
+    <tbody>
+      <tr><td style="color:var(--phase1)"><strong>1</strong></td><td>환경 설정 + A 캘린더 + Deep Sleep</td><td>A</td><td>2주</td></tr>
+      <tr><td style="color:var(--phase2)"><strong>2</strong></td><td>B 센서 + OLED + 버튼</td><td>B</td><td>2주</td></tr>
+      <tr><td style="color:var(--phase3)"><strong>3</strong></td><td>ESP-NOW 통신 + GPIO wake + 절전 프리셋</td><td>A+B</td><td>2주</td></tr>
+      <tr><td style="color:var(--phase4)"><strong>4</strong></td><td>WiFi API (날씨 · OpenAI · Spotify · NTP)</td><td>B</td><td>2주</td></tr>
+      <tr><td style="color:var(--phase5)"><strong>5</strong></td><td>I2S 오디오 (인터넷 라디오 + 알림음)</td><td>B</td><td>2주</td></tr>
+      <tr><td style="color:var(--phase6)"><strong>6</strong></td><td>스마트폰 WebServer 연동</td><td>B</td><td>1주</td></tr>
+      <tr><td style="color:var(--phase7)"><strong>7</strong></td><td>통합 + FreeRTOS + 자동 모드 전환</td><td>A+B</td><td>2주</td></tr>
+      <tr><td style="color:var(--phase8)"><strong>8</strong></td><td>최적화 + 안정화 + OTA</td><td>A+B</td><td>2주</td></tr>
+    </tbody>
+  </table>
+  <div class="summary-grid" style="margin-top:24px;">
+    <div class="summary-card">
+      <h4>총 예상 기간</h4>
+      <div class="big-num" style="color:var(--accent)">15주</div>
+    </div>
+    <div class="summary-card">
+      <h4>총 예상 비용</h4>
+      <div class="big-num" style="color:var(--accent2)">~$60</div>
+    </div>
+    <div class="summary-card">
+      <h4>A 배터리 수명 (스마트 모드)</h4>
+      <div class="big-num" style="color:var(--accent3)">3~6개월</div>
+    </div>
+    <div class="summary-card">
+      <h4>LoRa 확장 가능</h4>
+      <div class="big-num" style="color:var(--accent5)">✓</div>
+      <p style="color:var(--text-muted);font-size:0.85em;">장거리 통신, Meshtastic 연동</p>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<footer>
+  DualCore Station — ESP32 듀얼 보드 스마트 디스플레이 프로젝트<br>
+  A: CrowPanel ESP32 4.2" E-Paper &nbsp;·&nbsp; B: Heltec WiFi LoRa V3<br>
+  <span style="color:var(--text-muted)">Generated 2026-06-01</span>
+</footer>
+
+</body>
+</html>
