@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DualCore Smart Display — 프로젝트 발표 문서</title>
+<style>
+  :root{
+    --bg:#0f1226; --bg2:#16213e; --card:#1b2547; --accent:#e94560;
+    --accent2:#5ad; --text:#eef1f8; --muted:#9fb0d0; --line:#2c3a63;
+    --green:#39d98a; --yellow:#ffd166; --code-bg:#0b1020;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; font-family:'Segoe UI','Apple SD Gothic Neo',sans-serif;
+    background:linear-gradient(160deg,#0f1226,#13183a);
+    color:var(--text); line-height:1.7;
+  }
+  /* ── 레이아웃 ── */
+  .wrap{display:flex; max-width:1400px; margin:0 auto;}
+  nav{
+    position:sticky; top:0; align-self:flex-start; height:100vh;
+    width:260px; padding:28px 18px; overflow-y:auto;
+    background:rgba(11,16,32,.6); border-right:1px solid var(--line);
+    backdrop-filter:blur(6px);
+  }
+  nav h2{font-size:18px; color:var(--accent); margin:0 0 18px;}
+  nav a{
+    display:block; color:var(--muted); text-decoration:none; font-size:14px;
+    padding:7px 12px; border-radius:8px; margin:2px 0; transition:.2s;
+  }
+  nav a:hover{background:var(--card); color:var(--text);}
+  nav a.sub{padding-left:26px; font-size:13px; opacity:.85;}
+  main{flex:1; padding:48px 56px; min-width:0;}
+
+  /* ── 헤더 ── */
+  header.hero{
+    text-align:center; padding:60px 30px; margin-bottom:48px;
+    background:radial-gradient(circle at 50% 0%,rgba(233,69,96,.18),transparent 70%);
+    border-radius:20px; border:1px solid var(--line);
+  }
+  header.hero h1{font-size:42px; margin:0 0 10px; letter-spacing:-1px;}
+  header.hero .sub{font-size:18px; color:var(--accent2); margin-bottom:24px;}
+  .badges{display:flex; gap:10px; justify-content:center; flex-wrap:wrap;}
+  .badge{
+    background:var(--card); border:1px solid var(--line); color:var(--muted);
+    padding:6px 14px; border-radius:30px; font-size:13px;
+  }
+
+  /* ── 섹션 ── */
+  section{margin-bottom:60px; scroll-margin-top:24px;}
+  h2.title{
+    font-size:28px; color:var(--text); border-left:5px solid var(--accent);
+    padding-left:16px; margin:0 0 8px;
+  }
+  h2.title .num{color:var(--accent); font-weight:700; margin-right:10px;}
+  h3{font-size:20px; color:var(--accent2); margin:32px 0 10px;}
+  p{color:#d6dcee;}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:24px 28px; margin:18px 0;
+  }
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+  .grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+  @media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr;} nav{display:none;} main{padding:28px;}}
+
+  .pill{
+    display:inline-block; font-size:12px; padding:3px 10px; border-radius:20px;
+    font-weight:600; margin-right:6px;
+  }
+  .pill.a{background:rgba(90,170,221,.2); color:var(--accent2);}
+  .pill.b{background:rgba(57,217,138,.2); color:var(--green);}
+
+  ul.clean{list-style:none; padding:0;}
+  ul.clean li{padding:8px 0 8px 26px; position:relative; border-bottom:1px dashed var(--line);}
+  ul.clean li:before{content:"▸"; color:var(--accent); position:absolute; left:4px;}
+  ul.clean li:last-child{border-bottom:none;}
+
+  code{background:var(--code-bg); padding:2px 7px; border-radius:5px; font-size:13px; color:var(--yellow);}
+  pre{
+    background:var(--code-bg); border:1px solid var(--line); border-radius:10px;
+    padding:18px 20px; overflow-x:auto; font-size:13px; line-height:1.6;
+  }
+  pre code{background:none; padding:0; color:#cdd6f4;}
+
+  table{width:100%; border-collapse:collapse; margin:14px 0; font-size:14px;}
+  th,td{padding:11px 14px; text-align:left; border-bottom:1px solid var(--line);}
+  th{background:rgba(233,69,96,.12); color:var(--text);}
+  td{color:var(--muted);}
+
+  /* ── 아키텍처 다이어그램 ── */
+  .arch{display:flex; align-items:center; justify-content:center; gap:18px; flex-wrap:wrap; margin:20px 0;}
+  .node{
+    background:var(--card); border:2px solid var(--line); border-radius:14px;
+    padding:18px 22px; text-align:center; min-width:140px;
+  }
+  .node.b{border-color:var(--green);}
+  .node.a{border-color:var(--accent2);}
+  .node .ttl{font-weight:700; font-size:16px;}
+  .node .desc{font-size:12px; color:var(--muted); margin-top:6px;}
+  .arrow{color:var(--accent); font-size:24px; font-weight:700;}
+
+  /* ── 시퀀스 ── */
+  .seq{counter-reset:step; padding:0; list-style:none;}
+  .seq li{
+    position:relative; padding:16px 16px 16px 60px; margin:12px 0;
+    background:var(--card); border-radius:12px; border:1px solid var(--line);
+  }
+  .seq li:before{
+    counter-increment:step; content:counter(step);
+    position:absolute; left:16px; top:50%; transform:translateY(-50%);
+    width:30px; height:30px; border-radius:50%; background:var(--accent);
+    color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;
+  }
+  .note{border-left:4px solid var(--yellow); background:rgba(255,209,102,.08); padding:14px 18px; border-radius:8px; margin:16px 0;}
+  .note b{color:var(--yellow);}
+  footer{text-align:center; color:var(--muted); padding:40px; border-top:1px solid var(--line); margin-top:40px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ── 사이드 목차 ── -->
+<nav>
+  <h2>목차</h2>
+  <a href="#overview">1. 프로젝트 개요</a>
+  <a href="#hardware">2. 하드웨어 구성</a>
+  <a href="#architecture">3. 시스템 아키텍처</a>
+  <a href="#protocol">4. 통신 프로토콜 (ESP-NOW)</a>
+  <a href="#boardb">5. B보드 — 게이트웨이</a>
+  <a href="#boarda">6. A보드 — e-paper</a>
+  <a href="#config">7. 설정 동기화 메커니즘</a>
+  <a href="#scenario">8. 동작 시나리오</a>
+  <a href="#build">9. 빌드 & 설정</a>
+  <a href="#limits">10. 한계 & 개선점</a>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>DualCore Smart Display</h1>
+  <div class="sub">ESP32 듀얼 보드 기반 저전력 스마트 책상 디스플레이</div>
+  <div class="badges">
+    <span class="badge">ESP32 · ESP-NOW</span>
+    <span class="badge">e-Paper (GxEPD2)</span>
+    <span class="badge">Open-Meteo API</span>
+    <span class="badge">Gemini AI</span>
+    <span class="badge">Deep Sleep</span>
+  </div>
+</header>
+
+<!-- 1 -->
+<section id="overview">
+  <h2 class="title"><span class="num">01</span>프로젝트 개요</h2>
+  <p>책상 위에서 <b>날짜·날씨·대기질·AI 생활 조언</b>을 보여주는 스마트 디스플레이입니다.
+  역할이 다른 두 개의 ESP32 보드를 <b>ESP-NOW</b>로 연결해, 한쪽은 인터넷 데이터를 모으는 게이트웨이로,
+  다른 쪽은 배터리로 오래 버티는 저전력 표시 단말로 분리한 것이 핵심 설계입니다.</p>
+  <div class="grid2">
+    <div class="card">
+      <span class="pill b">B 보드</span><b>게이트웨이 / 상시 동작</b>
+      <p style="margin:10px 0 0">WiFi로 인터넷에 연결되어 날씨·대기질 API와 Gemini AI를 호출하고,
+      센서를 읽으며, 웹 설정 페이지를 제공합니다. OLED로 상태를 실시간 표시합니다.</p>
+    </div>
+    <div class="card">
+      <span class="pill a">A 보드</span><b>디스플레이 / 저전력</b>
+      <p style="margin:10px 0 0">평소 Deep Sleep 상태로 대기하다가 정해진 시각이나 버튼 입력에 깨어나,
+      B보드에 데이터를 요청해 e-paper에 그린 뒤 다시 잠듭니다.</p>
+    </div>
+  </div>
+  <div class="note"><b>왜 두 보드로 나눴나?</b> WiFi와 API 호출은 전력 소모가 크기 때문에,
+  이 부분을 B보드가 전담하고 A보드는 ESP-NOW 통신과 화면 갱신만 담당하게 하여
+  A보드의 배터리 수명을 극대화했습니다.</div>
+</section>
+
+<!-- 2 -->
+<section id="hardware">
+  <h2 class="title"><span class="num">02</span>하드웨어 구성</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">B 보드 (센서 게이트웨이)</h3>
+      <table>
+        <tr><th>부품</th><th>핀 / 주소</th></tr>
+        <tr><td>DHT11 온습도</td><td>GPIO 1</td></tr>
+        <tr><td>조도 센서</td><td>GPIO 2 (ADC)</td></tr>
+        <tr><td>PIR 모션</td><td>GPIO 3</td></tr>
+        <tr><td>SSD1306 OLED</td><td>SDA17 / SCL18 / 0x3C</td></tr>
+        <tr><td>VEXT 전원 제어</td><td>GPIO 36</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">A 보드 (e-paper 디스플레이)</h3>
+      <table>
+        <tr><th>부품</th><th>핀</th></tr>
+        <tr><td>4.2" e-Paper (GYE042A87)</td><td>CS45 DC46 RST47 BUSY48</td></tr>
+        <tr><td>전원 제어</td><td>EPD_PWR 7</td></tr>
+        <tr><td>버튼 MENU/EXIT</td><td>GPIO 2 / 1</td></tr>
+        <tr><td>버튼 UP/DOWN/OK</td><td>GPIO 6 / 4 / 5</td></tr>
+        <tr><td>해상도</td><td>400 × 300</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section id="architecture">
+  <h2 class="title"><span class="num">03</span>시스템 아키텍처</h2>
+  <p>인터넷에서 들어온 데이터가 B보드를 거쳐 ESP-NOW로 A보드에 전달되고, 최종적으로 e-paper에 표시됩니다.</p>
+  <div class="card">
+    <div class="arch">
+      <div class="node"><div class="ttl">🌐 Internet</div><div class="desc">Open-Meteo<br>Gemini AI · NTP</div></div>
+      <span class="arrow">→</span>
+      <div class="node b"><div class="ttl">B 보드</div><div class="desc">WiFi · API 수집<br>센서 · 웹설정</div></div>
+      <span class="arrow">⇄</span>
+      <div class="node a"><div class="ttl">A 보드</div><div class="desc">Deep Sleep<br>화면 렌더링</div></div>
+      <span class="arrow">→</span>
+      <div class="node"><div class="ttl">🖥️ e-Paper</div><div class="desc">캘린더 / 날씨<br>대기질 / AI</div></div>
+    </div>
+    <p style="text-align:center; color:var(--muted); margin-bottom:0">
+    B↔A 사이는 WiFi가 아닌 <b style="color:var(--accent2)">ESP-NOW</b>(저전력 P2P)로 직접 통신 · 채널 10 고정</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section id="protocol">
+  <h2 class="title"><span class="num">04</span>통신 프로토콜 (ESP-NOW)</h2>
+  <p>두 보드는 동일한 구조체와 메시지 타입을 공유합니다. 수신 측은 <b>패킷 크기</b>로 메시지 종류를 구분합니다.</p>
+
+  <h3>4.1 메시지 타입</h3>
+  <table>
+    <tr><th>타입</th><th>값</th><th>방향</th><th>설명</th></tr>
+    <tr><td>MSG_REQUEST</td><td>0</td><td>A → B</td><td>센서 데이터 요청</td></tr>
+    <tr><td>MSG_SENSOR_DATA</td><td>1</td><td>B → A</td><td>센서·시간·날씨·설정 응답</td></tr>
+    <tr><td>MSG_AI_REQUEST</td><td>2</td><td>A → B</td><td>AI 멘트 요청</td></tr>
+    <tr><td>MSG_AI_CHUNK</td><td>3</td><td>B → A</td><td>AI 멘트 분할 전송</td></tr>
+  </table>
+
+  <h3>4.2 Message 구조체 (메인 데이터)</h3>
+  <p>온습도, 현재 시간, 6개 시간대 날씨 예보, 오늘 최고/최저·강수확률, PM2.5·AQI, 그리고
+  <code>BoardConfig</code> 설정값까지 한 번에 담아 전달합니다.</p>
+
+  <h3>4.3 AIChunk — 청크 분할 전송</h3>
+  <p>AI 멘트는 최대 800자(<code>200바이트 × 4</code>)까지 가능하지만 ESP-NOW 한 패킷이 작기 때문에,
+  멘트를 <b>200바이트 단위로 나눠</b> 순차 전송하고 A보드가 재조립합니다.</p>
+  <pre><code>typedef struct {
+  uint8_t  msgType;       // MSG_AI_CHUNK
+  uint8_t  totalChunks;   // 전체 조각 수
+  uint8_t  chunkIndex;    // 현재 조각 번호
+  uint8_t  dataLen;       // 이 조각의 실제 길이
+  uint8_t  commentDay;    // 멘트 생성 날짜(중복 방지)
+  char     data[200];     // 조각 데이터
+} AIChunk;</code></pre>
+
+  <h3>4.4 요청–응답 흐름</h3>
+  <p>A보드는 응답이 올 때까지 최대 <b>3회 재시도</b>(<code>SCAN_ATTEMPTS</code>)하며,
+  센서는 1초·AI는 2초의 타임아웃을 둡니다. 응답이 없으면 RTC 메모리의 <b>캐시 데이터</b>를 사용합니다.</p>
+</section>
+
+<!-- 5 -->
+<section id="boardb">
+  <h2 class="title"><span class="num">05</span>B 보드 — 게이트웨이 <span class="pill b" style="font-size:14px">상시 동작</span></h2>
+
+  <div class="grid2">
+    <div class="card"><h3 style="margin-top:0">WiFi & AP 모드</h3>
+    저장된 자격증명으로 접속을 시도하고, 실패하거나 설정이 없으면
+    <code>DualCore-Setup</code> AP를 띄워 웹으로 설정받습니다.</div>
+    <div class="card"><h3 style="margin-top:0">외부 API 연동</h3>
+    Open-Meteo(날씨), Open-Meteo Air Quality(대기질), Google Gemini(생활 조언 1줄)를 호출합니다.</div>
+    <div class="card"><h3 style="margin-top:0">NTP 시간 동기화</h3>
+    한국 시간(KST, GMT+9)으로 시각을 맞추고 A보드에 함께 전달합니다.</div>
+    <div class="card"><h3 style="margin-top:0">웹 설정 페이지</h3>
+    위치·기상 좌표·기상시각·화면 타임아웃·AI on/off 등을 변경하고, 공장 초기화도 가능합니다.</div>
+  </div>
+
+  <h3>AI 멘트 생성 (Gemini)</h3>
+  <p>오늘의 기상·대기질 데이터를 프롬프트에 넣어 <b>영어 18단어 이내의 생활 팁</b>을 생성합니다.
+  하루 한 번만 생성하며 NVS에 저장해 재부팅 후에도 유지합니다.</p>
+  <pre><code>"You are a friendly daily assistant for a desk display in Daejeon, Korea.
+ Today's data: high X C, low X C, rain X%, PM2.5 X, US AQI X (grade).
+ Write ONE short practical life tip in English, max 18 words..."</code></pre>
+</section>
+
+<!-- 6 -->
+<section id="boarda">
+  <h2 class="title"><span class="num">06</span>A 보드 — e-paper 디스플레이 <span class="pill a" style="font-size:14px">저전력</span></h2>
+
+  <h3>화면 모드 (버튼 네비게이션)</h3>
+  <div class="grid3">
+    <div class="card"><b>📅 Calendar</b><p style="margin:8px 0 0">일/월 보기 전환 (MENU)</p></div>
+    <div class="card"><b>🌤️ Weather</b><p style="margin:8px 0 0">6개 시간대 예보</p></div>
+    <div class="card"><b>🌫️ Air/Env</b><p style="margin:8px 0 0">종합 + AI 멘트</p></div>
+  </div>
+  <p style="margin-top:14px">UP/DOWN으로 모드 전환, OK로 새로고침, EXIT로 시스템 Info 화면 진입.</p>
+
+  <h3>e-paper 렌더링 전략</h3>
+  <ul class="clean">
+    <li><b>부분 갱신(partial)</b>으로 빠르게 그리되, <code>fullRefreshEvery</code> 횟수마다 한 번씩 <b>전체 갱신</b>으로 잔상을 제거합니다.</li>
+    <li>날씨 코드별 24×24 비트맵 아이콘(맑음/구름/비/눈/안개/뇌우)을 표시하고, AI 멘트는 워드랩으로 줄바꿈합니다.</li>
+  </ul>
+
+  <h3>Deep Sleep & 전력 관리</h3>
+  <p>화면을 그린 뒤 일정 시간(<code>sleepTimeoutSec</code>) 입력이 없으면 캘린더로 복귀 후 잠듭니다.
+  다음 기상은 설정된 <code>wakeHour</code>까지의 시간을 계산해 <b>타이머</b>로, 또는 <b>버튼</b>으로 깨어납니다.</p>
+  <div class="note"><b>RTC 메모리 활용:</b> <code>RTC_DATA_ATTR</code> 변수로 시간·날씨·AI 멘트·설정을
+  Deep Sleep 동안 유지하므로, 통신이 실패해도 마지막 데이터를 그대로 표시할 수 있습니다.</div>
+</section>
+
+<!-- 7 -->
+<section id="config">
+  <h2 class="title"><span class="num">07</span>설정 동기화 메커니즘 <span class="pill" style="background:rgba(255,209,102,.2);color:var(--yellow);font-size:14px">핵심</span></h2>
+  <p>B보드에서 바꾼 설정을 A보드에 안전하게 전파하기 위해 <b>버전 번호(<code>configVersion</code>)</b> 방식을 사용합니다.</p>
+  <ul class="clean">
+    <li>웹에서 설정을 저장하면 B보드의 <code>configVersion</code>이 <b>1 증가</b>합니다.</li>
+    <li>설정값은 매 센서 응답(<code>Message</code>)에 실려 A보드로 전달됩니다.</li>
+    <li>A보드는 받은 버전이 <b>현재 적용된 버전보다 클 때만</b> 새 설정을 적용합니다.</li>
+    <li>덕분에 같은 설정이 반복 수신돼도 불필요한 갱신이 없고, 변경 시점만 정확히 반영됩니다.</li>
+  </ul>
+  <pre><code>// A보드 수신 콜백
+if (rxMsg.config.configVersion > lastCfgVersion) {
+  appliedCfg     = rxMsg.config;          // 새 설정 적용
+  lastCfgVersion = rxMsg.config.configVersion;
+  savedChannel   = appliedCfg.espnowChannel;
+}</code></pre>
+  <p style="color:var(--muted)">→ "A보드는 다음에 깨어날 때 새 설정을 반영합니다"라는 동작이 여기서 구현됩니다.</p>
+</section>
+
+<!-- 8 -->
+<section id="scenario">
+  <h2 class="title"><span class="num">08</span>동작 시나리오</h2>
+  <ol class="seq">
+    <li>A보드가 <b>타이머/버튼</b>으로 Deep Sleep에서 기상하고 ESP-NOW를 초기화합니다.</li>
+    <li>B보드에 <b>센서 데이터를 요청</b> (온습도·시간·날씨·대기질·설정 수신).</li>
+    <li>Air/Env 모드이고 AI가 켜져 있으면 <b>AI 멘트를 요청</b>해 청크로 수신·재조립합니다.</li>
+    <li>현재 모드에 맞는 화면을 <b>e-paper에 렌더링</b>합니다.</li>
+    <li>타임아웃까지 입력이 없으면 캘린더로 복귀 후 <b>Deep Sleep 재진입</b>.</li>
+  </ol>
+  <div class="note"><b>통신 실패 시:</b> 재시도 후에도 응답이 없으면 RTC 메모리의 마지막 데이터(캐시)로
+  화면을 그려 항상 무언가는 표시되도록 보장합니다.</div>
+</section>
+
+<!-- 9 -->
+<section id="build">
+  <h2 class="title"><span class="num">09</span>빌드 & 설정</h2>
+  <ul class="clean">
+    <li><b>라이브러리:</b> WiFi, esp_now, WebServer, Preferences, Adafruit_SSD1306, DHT, ArduinoJson, GxEPD2</li>
+    <li><b>MAC 주소 매칭:</b> 각 보드 코드의 <code>peerMAC_A</code> / <code>peerMAC_B</code>를 상대 보드 실제 MAC으로 설정</li>
+    <li><b>ESP-NOW 채널 일치:</b> 두 보드 모두 채널 10 (<code>FIXED_CHANNEL</code>)</li>
+    <li><b>Gemini API 키:</b> <code>GEMINI_API_KEY</code>에 본인 키 입력 (코드에 직접 노출 주의)</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section id="limits">
+  <h2 class="title"><span class="num">10</span>한계 & 개선점</h2>
+  <ul class="clean">
+    <li><b>API 키 하드코딩:</b> 소스에 키가 노출되므로 NVS 저장이나 별도 설정 분리가 바람직합니다.</li>
+    <li><b>AI 멘트 갱신:</b> 하루 1회 생성 — 날씨 급변 시 반영이 늦을 수 있습니다.</li>
+    <li><b>ESP-NOW 비암호화:</b> 현재 <code>encrypt = false</code> 상태로, 필요 시 암호화 적용 가능.</li>
+    <li><b>고정 위치(대전):</b> 좌표는 변경 가능하나 AI 프롬프트 도시명은 고정되어 있습니다.</li>
+  </ul>
+</section>
+
+<footer>
+  DualCore Smart Display — ESP32 발표 자료 · 작성용 템플릿
+</footer>
+</main>
+</div>
+</body>
+</html>
