@@ -316,7 +316,6 @@ if (sec &lt;= 0) sec = 3600;       // 안전장치: 최소 1시간</code></pre>
 if (rxMsg.config.configVersion > lastCfgVersion) {
   appliedCfg     = rxMsg.config;          // 새 설정 적용
   lastCfgVersion = rxMsg.config.configVersion;
-  savedChannel   = appliedCfg.espnowChannel;
 }</code></pre>
   </section>
 
@@ -351,7 +350,9 @@ if (rxMsg.config.configVersion > lastCfgVersion) {
     <ul class="clean">
       <li><b>라이브러리:</b> WiFi, esp_now, WebServer, Preferences, Adafruit_SSD1306, DHT, ArduinoJson, GxEPD2</li>
       <li><b>MAC 매칭:</b> <code>peerMAC_A</code> / <code>peerMAC_B</code>를 상대 보드 실제 MAC으로 설정</li>
-      <li><b>ESP-NOW 채널 일치:</b> 두 보드 모두 채널 10(<code>FIXED_CHANNEL</code>)</li>
+      <li><b>ESP-NOW 채널 자동 탐색:</b> 고정 채널이 아니라 A보드가 <code>savedChannel</code>을 우선 시도하고,
+      실패 시 1~13 채널을 스캔해 B를 찾음. 성공한 채널은 RTC에 저장해 다음 부팅 때 우선 사용
+      (스캔 실패 시 폴백값은 <code>DEFAULT_CHANNEL</code> = 10)</li>
       <li><b>Gemini API 키:</b> <code>GEMINI_API_KEY</code>에 본인 키 입력 (소스 노출 주의)</li>
     </ul>
   </section>
