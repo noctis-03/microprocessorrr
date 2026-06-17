@@ -369,5 +369,112 @@ if (rxMsg.config.configVersion > lastCfgVersion) {
   <div class="footer">DualCore Smart Display — 6 / 6</div>
 </div>
 
+<!-- ════ 페이지 7 — C보드 확장 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">11</span>C 보드 — 액추에이터 노드</h2>
+    <p>기존 A·B 2-보드 구성에 <b>C 보드(HG-ESP32 DevKit V4)</b>를 추가해, 거리·환경에 반응하는
+    <b>LED 조명과 선풍기(모터)</b>를 제어하는 액추에이터 노드를 구성했습니다. B보드를 <b>허브</b>로 하여
+    <code>A &harr; B</code>, <code>B &harr; C</code>의 두 ESP-NOW 링크가 동작하며, C는 B에 주기적으로
+    센서·설정을 요청합니다(A 코드는 변경 없음).</p>
+
+    <div class="box">
+      <div class="arch">
+        <div class="node"><div class="t">A 보드</div><div class="d">e-Paper<br>저전력</div></div>
+        <span class="arrow">&hArr;</span>
+        <div class="node"><div class="t">B 보드 (허브)</div><div class="d">WiFi·API·센서<br>웹 설정</div></div>
+        <span class="arrow">&hArr;</span>
+        <div class="node"><div class="t">C 보드</div><div class="d">LED·선풍기<br>서보·초음파</div></div>
+      </div>
+      <p style="text-align:center; color:#666; margin:6px 0 0; font-size:9.5pt">
+      B는 허브로서 A와 C 양쪽과 통신 · C는 <b>2초 주기</b>로 B에 센서/설정 요청 후 응답을 수신</p>
+    </div>
+
+    <h3>하드웨어 구성 (C 보드)</h3>
+    <div class="grid2">
+      <div>
+        <table>
+          <tr><th>부품</th><th>핀</th></tr>
+          <tr><td>NeoPixel LED (×10)</td><td>GPIO 4</td></tr>
+          <tr><td>초음파 TRIG / ECHO</td><td>13 / 14</td></tr>
+          <tr><td>DC 모터(선풍기)</td><td>IA25 / IB26</td></tr>
+        </table>
+      </div>
+      <div>
+        <table>
+          <tr><th>부품</th><th>핀</th></tr>
+          <tr><td>서보 Pan / Tilt</td><td>33 / 32</td></tr>
+          <tr><td>조이스틱 X / Y</td><td>34 / 35</td></tr>
+          <tr><td>조이스틱 버튼</td><td>GPIO 27</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="note"><b>역할 분리 유지:</b> C는 환경 센서를 직접 갖지 않고, 자동 모드 판단에 필요한
+    온도·조도·PIR 값을 <b>B보드로부터 수신</b>합니다. 조이스틱→서보(Pan/Tilt) 조작은 모드와 무관하게 항상 유지됩니다.</div>
+  </section>
+  <div class="footer">DualCore Smart Display — 7 / 8</div>
+</div>
+
+<!-- ════ 페이지 8 — C보드 동작/프로토콜 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">12</span>C 보드 동작 모드</h2>
+    <p>C 보드는 B보드 웹 설정 페이지에서 선택하는 <b>두 가지 동작 모드</b>를 가집니다.
+    모드와 출력 설정은 ESP-NOW 응답에 실려 전달되며, A보드와 동일한 <b>버전 번호 방식</b>으로 변경 시점만 반영합니다.</p>
+
+    <div class="grid2">
+      <div class="box"><span class="tag">Default</span><b>거리 기반 (초음파)</b>
+      <p style="margin:8px 0 0">초음파로 측정한 거리가 트리거 범위 안에 들어오면 출력을 켭니다.
+      무엇을 켤지는 웹에서 <b>LED+선풍기 / 선풍기만 / LED만</b> 중 선택할 수 있습니다.</p></div>
+      <div class="box"><span class="tag">Auto</span><b>환경 기반 (B 센서)</b>
+      <p style="margin:8px 0 0">초음파 거리와 무관하게, B의 <b>온도·조도·PIR</b> 값을 보고 자동으로 켜고 끕니다.
+      사람이 감지될 때만 동작하여 불필요한 작동을 막습니다.</p></div>
+    </div>
+
+    <h3>자동 모드 판단 규칙</h3>
+    <table>
+      <tr><th>출력</th><th>켜지는 조건</th></tr>
+      <tr><td>선풍기</td><td>온도 ≥ 28&#8451; <b>그리고</b> PIR 사람 감지</td></tr>
+      <tr><td>LED</td><td>조도 어두움(임계값 이하) <b>그리고</b> PIR 사람 감지</td></tr>
+      <tr><td>둘 다 OFF</td><td>사람 미감지 시, 또는 B 데이터 수신이 일정 시간 끊겼을 때</td></tr>
+    </table>
+
+    <h3>출력 선택 (Default 모드)</h3>
+    <table>
+      <tr><th>값</th><th>상수</th><th>동작</th></tr>
+      <tr><td>0</td><td>OUT_BOTH</td><td>LED + 선풍기 (기본값)</td></tr>
+      <tr><td>1</td><td>OUT_FAN</td><td>선풍기만</td></tr>
+      <tr><td>2</td><td>OUT_LED</td><td>LED만</td></tr>
+    </table>
+  </section>
+
+  <section class="no-break">
+    <h2 class="sec"><span class="n">13</span>C 보드 통신 프로토콜</h2>
+    <p>C는 B에 요청을 보내고, B는 최신 센서값과 C 설정을 응답합니다. A·C 메시지는 <b>패킷 크기</b>로 구분되며
+    충돌하지 않도록 C 전용 타입(10·11)을 사용합니다.</p>
+    <table>
+      <tr><th>타입</th><th>값</th><th>방향</th><th>설명</th></tr>
+      <tr><td>MSG_C_REQUEST</td><td>10</td><td>C → B</td><td>센서·설정 요청</td></tr>
+      <tr><td>MSG_C_DATA</td><td>11</td><td>B → C</td><td>온도·조도·PIR + C 설정 응답</td></tr>
+    </table>
+    <pre><code>typedef struct {                 // B → C 응답
+  uint8_t  msgType;     // MSG_C_DATA
+  float    temperature; // B의 DHT11 온도
+  int      lightLevel;  // B의 조도센서 raw
+  uint8_t  motion;      // B의 PIR (1=감지)
+  CConfig  config;      // 모드/출력/버전
+} CMessage;
+
+typedef struct {                 // C 설정
+  uint8_t  cMode;       // 0=Default, 1=Auto
+  uint8_t  cOutput;     // 0=Both, 1=Fan, 2=LED
+  uint16_t cfgVersion;  // 변경 감지용 버전
+} CConfig;</code></pre>
+    <div class="note"><b>채널 자동 탐색:</b> C도 A처럼 <code>savedChannel</code>을 우선 시도하고 실패하면
+    1~13 채널을 스캔해 B를 찾습니다. <b>B 통신이 일정 시간 끊기면</b> 자동 모드에서는 안전을 위해 출력을 모두 끕니다.</div>
+  </section>
+  <div class="footer">DualCore Smart Display — 8 / 8</div>
+</div>
+
 </body>
 </html>
