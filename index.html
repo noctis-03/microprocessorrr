@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DualCore Smart Display — 프로젝트 문서</title>
+<title>저전력 E-Paper 스마트 홈 캘린더 + 탁상용 선풍기 — 발표 참고자료</title>
 <style>
   * { box-sizing: border-box; }
   html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -35,11 +35,16 @@
     align-items: center;
     text-align: center;
   }
-  .cover h1 { font-size: 30pt; margin: 0 0 6px; letter-spacing: -.5px; }
+  .cover h1 { font-size: 28pt; margin: 0 0 6px; letter-spacing: -.5px; }
   .cover .sub { font-size: 13pt; color: #555; margin-bottom: 30px; }
   .cover .line { width: 60px; height: 3px; background: #1a1a1a; margin: 24px 0; }
   .cover .tags { font-size: 10pt; color: #666; letter-spacing: .5px; }
   .cover .desc { max-width: 130mm; color: #444; margin-top: 30px; font-size: 11pt; }
+  .cover .info { margin-top: 40px; font-size: 10.5pt; color: #444; }
+  .cover .info table { border: none; width: auto; margin: 0 auto; }
+  .cover .info td { border: none; padding: 4px 16px; }
+  .cover .info td:first-child { color: #888; text-align: right; }
+  .cover .info td:last-child { font-weight: 600; text-align: left; }
 
   /* ── 제목 ── */
   h2.sec {
@@ -68,6 +73,7 @@
     padding: 12px 16px; margin: 12px 0; background: #fafafa;
   }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
   .tag { display: inline-block; font-size: 8.5pt; font-weight: 700;
          border: 1px solid #999; border-radius: 12px; padding: 1px 9px; margin-right: 6px; }
 
@@ -88,6 +94,7 @@
   table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9.5pt; }
   th, td { padding: 7px 10px; text-align: left; border: 1px solid #ddd; }
   th { background: #f0f0f0; font-weight: 600; }
+  td.center, th.center { text-align: center; }
 
   /* ── 아키텍처 ── */
   .arch { display: flex; align-items: center; justify-content: center;
@@ -100,11 +107,11 @@
 
   /* ── 시퀀스 ── */
   .seq { counter-reset: s; list-style: none; padding: 0; margin: 14px 0; }
-   .seq > li { position: relative; padding: 10px 12px 10px 42px; margin: 8px 0;
+  .seq > li { position: relative; padding: 10px 12px 10px 42px; margin: 8px 0;
             border: 1px solid #ddd; border-radius: 5px; background: #fafafa; }
   .seq > li:before {
     counter-increment: s; content: counter(s);
-    position: absolute; left: 10px; top: 18px;
+    position: absolute; left: 10px; top: 14px;
     width: 22px; height: 22px; border-radius: 50%; background: #1a1a1a;
     color: #fff; display: flex; align-items: center; justify-content: center;
     font-weight: 700; font-size: 9pt;
@@ -113,6 +120,26 @@
 
   .note { border-left: 3px solid #888; background: #f4f4f4;
           padding: 10px 14px; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+  .highlight { border-left: 3px solid #b03030; background: #fdf4f4;
+          padding: 10px 14px; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+
+  /* SCAMPER 카드 */
+  .scamper { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+  .scamper .card { border: 1px solid #ddd; border-radius: 5px; padding: 10px 12px; background: #fafafa; }
+  .scamper .card .letter { display:inline-block; width:24px; height:24px; line-height:24px;
+    text-align:center; background:#1a1a1a; color:#fff; border-radius:50%;
+    font-weight:700; font-size:10pt; margin-right:8px; }
+  .scamper .card .title { font-weight: 700; font-size: 10pt; }
+  .scamper .card .body { font-size: 9pt; color: #444; margin-top: 4px; }
+
+  /* 평가 점수 */
+  .score { display: inline-block; width: 22px; height: 22px; line-height: 22px;
+    text-align: center; border-radius: 3px; font-weight: 700; font-size: 9pt; }
+  .s5 { background: #1a1a1a; color: #fff; }
+  .s4 { background: #555; color: #fff; }
+  .s3 { background: #999; color: #fff; }
+  .s2 { background: #ccc; color: #333; }
+  .s1 { background: #eee; color: #666; }
 
   .footer { position: absolute; bottom: 10mm; left: 16mm; right: 16mm;
             text-align: center; font-size: 8pt; color: #aaa;
@@ -130,115 +157,433 @@
 </head>
 <body>
 
-<!-- ════ 표지 + 목차 ════ -->
+<!-- ════ 페이지 1 : 표지 ════ -->
 <div class="page cover">
-  <h1>DualCore Smart Display</h1>
-  <div class="sub">ESP32 듀얼 보드 기반 저전력 스마트 책상 디스플레이 + 스마트 책상용 선풍기</div>
+  <div style="font-size:11pt; color:#888; letter-spacing:2px; margin-bottom:8px">발표 참고자료</div>
+  <h1>저전력 E-Paper 디스플레이를<br>활용한 스마트 홈 캘린더</h1>
+  <div class="sub">+ 탁상용 선풍기 (3-보드 확장 구성)</div>
   <div class="line"></div>
-  <div class="tags">ESP-NOW · e-Paper · Open-Meteo · Gemini AI · Deep Sleep</div>
+  <div class="tags">ESP32 · ESP-NOW · E-Paper · Open-Meteo · Gemini AI · Deep Sleep</div>
   <p class="desc">두 개의 ESP32 보드를 ESP-NOW로 연결하여, 한쪽은 인터넷 데이터를 수집하는
-  게이트웨이로, 다른 쪽은 배터리로 오래 동작하는 저전력 e-paper 디스플레이로 구성한 프로젝트입니다.</p>
+  게이트웨이로, 다른 쪽은 배터리로 오래 동작하는 저전력 e-paper 디스플레이로 구성하고,
+  여기에 거리·환경에 반응하는 탁상용 선풍기(C 보드)를 확장한 프로젝트입니다.</p>
 
-  <div style="margin-top:40px; width:100%; max-width:140mm; text-align:left;">
-    <h2 class="sec">목차</h2>
-    <ul class="toc">
-      <li><span>1. 프로젝트 개요</span><span>p.2</span></li>
-      <li><span>2. 하드웨어 구성</span><span>p.2</span></li>
-      <li><span>3. 시스템 아키텍처</span><span>p.3</span></li>
-      <li><span>4. 통신 프로토콜 (ESP-NOW)</span><span>p.3</span></li>
-      <li><span>5. B보드 — 게이트웨이</span><span>p.4</span></li>
-      <li><span>6. A보드 — e-paper 디스플레이</span><span>p.4</span></li>
-      <li><span>7. 설정 동기화 메커니즘</span><span>p.5</span></li>
-      <li><span>8. 동작 시나리오</span><span>p.5</span></li>
-      <li><span>9. 빌드 &amp; 설정 / 한계 &amp; 개선점</span><span>p.6</span></li>
-      <li><span>10. C 보드 추가 </span><span>p.6</span></li>
-    </ul>
+  <div class="info">
+    <table>
+      <tr><td>과제명</td><td>저전력 E-Paper 디스플레이를 활용한 스마트 홈 캘린더 + 탁상용 선풍기</td></tr>
+      <tr><td>학과</td><td>정보통신공학과</td></tr>
+      <tr><td>팀명</td><td>3조</td></tr>
+      <tr><td>팀원</td><td>최준서 · 김가온 · 오성준 · 홍민혁</td></tr>
+      <tr><td>지도교수</td><td>은성배 교수님</td></tr>
+      <tr><td>제출일</td><td>2026. 06. 18</td></tr>
+    </table>
   </div>
 </div>
 
-<!-- ════ 페이지 2 ════ -->
+<!-- ════ 페이지 2 : 목차 + 개요 ════ -->
 <div class="page">
   <section class="no-break">
-    <h2 class="sec"><span class="n">01</span>프로젝트 개요</h2>
-    <p>책상 위에서 <b>날짜·날씨·대기질·AI 생활 조언</b>을 보여주는 스마트 디스플레이입니다.
-    역할이 다른 두 ESP32 보드를 ESP-NOW로 연결해, 한쪽은 인터넷 데이터를 모으는 게이트웨이로,
-    다른 쪽은 배터리로 오래 버티는 저전력 표시 단말로 분리한 것이 핵심 설계입니다.</p>
-    <div class="grid2">
-      <div class="box"><span class="tag">B 보드</span><b>게이트웨이 / 상시 동작</b>
-      <p style="margin:8px 0 0">WiFi로 날씨·대기질 API와 Gemini AI를 호출하고, 센서를 읽으며,
-      웹 설정 페이지를 제공합니다. OLED로 상태를 표시합니다.</p></div>
-      <div class="box"><span class="tag">A 보드</span><b>디스플레이 / 저전력</b>
-      <p style="margin:8px 0 0">평소 Deep Sleep으로 대기하다 정해진 시각이나 버튼에 깨어나,
-      B보드에 데이터를 요청해 e-paper에 그린 뒤 다시 잠듭니다.</p></div>
-    </div>
-    <div class="note"><b>왜 두 보드로?</b> WiFi·API 호출은 전력 소모가 크므로 B보드가 전담하고,
-    A보드는 통신과 화면 갱신만 맡겨 배터리 수명을 극대화했습니다.</div>
+    <h2 class="sec"><span class="n">00</span>목차</h2>
+    <ul class="toc">
+      <li><span>1. 프로젝트 개요 &amp; 문제 정의</span><span>p.3</span></li>
+      <li><span>2. 관련 기술 — E-Paper · ESP-NOW · 외부 API</span><span>p.4</span></li>
+      <li><span>3. 기존 상용 시스템 · 특허 · 논문</span><span>p.5</span></li>
+      <li><span>4. 아이디어 창출 (SCAMPER) &amp; 평가</span><span>p.6</span></li>
+      <li><span>5. 시스템 구성도 &amp; 사용자 시나리오</span><span>p.7</span></li>
+      <li><span>6. A 보드 — E-Paper 디스플레이 설계</span><span>p.8</span></li>
+      <li><span>7. B 보드 — 게이트웨이 설계</span><span>p.9</span></li>
+      <li><span>8. C 보드 — 탁상용 선풍기 (추가 사유)</span><span>p.10</span></li>
+      <li><span>9. ESP-NOW 통신 프로토콜 &amp; 설정 동기화</span><span>p.11</span></li>
+      <li><span>10. 구현 결과 — 화면/동작</span><span>p.12</span></li>
+      <li><span>11. 성능 평가 (전력 소모 추정)</span><span>p.13</span></li>
+      <li><span>12. 현실적 제한조건 &amp; 팀 역할</span><span>p.14</span></li>
+    </ul>
   </section>
 
-  <section class="no-break">
-    <h2 class="sec"><span class="n">02</span>하드웨어 구성</h2>
-    <div class="grid2">
-      <div>
-        <h3 style="margin-top:6px">B 보드 (센서 게이트웨이)</h3>
-        <table>
-          <tr><th>부품</th><th>핀 / 주소</th></tr>
-          <tr><td>DHT11 온습도</td><td>GPIO 1</td></tr>
-          <tr><td>조도 센서</td><td>GPIO 2 (ADC)</td></tr>
-          <tr><td>PIR 모션</td><td>GPIO 3</td></tr>
-          <tr><td>SSD1306 OLED</td><td>SDA17 / SCL18</td></tr>
-          <tr><td>VEXT 전원</td><td>GPIO 36</td></tr>
-        </table>
+  <section class="no-break" style="margin-top:30px">
+    <h2 class="sec"><span class="n">01</span>프로젝트 한눈에 보기</h2>
+    <div class="grid3">
+      <div class="box" style="text-align:center">
+        <div class="tag">A 보드</div>
+        <h3 style="margin:8px 0 4px">E-Paper 디스플레이</h3>
+        <p style="font-size:9pt; color:#555; margin:0">Deep Sleep 기반 저전력 표시 단말<br>날짜·날씨·대기질·AI 멘트 표시</p>
       </div>
-      <div>
-        <h3 style="margin-top:6px">A 보드 (e-paper)</h3>
-        <table>
-          <tr><th>부품</th><th>핀</th></tr>
-          <tr><td>4.2" e-Paper</td><td>CS45 DC46 RST47</td></tr>
-          <tr><td>e-Paper BUSY</td><td>GPIO 48</td></tr>
-          <tr><td>전원 제어</td><td>EPD_PWR 7</td></tr>
-          <tr><td>버튼 5종</td><td>GPIO 1,2,4,5,6</td></tr>
-          <tr><td>해상도</td><td>400 × 300</td></tr>
-        </table>
+      <div class="box" style="text-align:center">
+        <div class="tag">B 보드</div>
+        <h3 style="margin:8px 0 4px">게이트웨이 (허브)</h3>
+        <p style="font-size:9pt; color:#555; margin:0">WiFi · API · 센서 · 웹 설정<br>A·C 양쪽과 ESP-NOW 통신</p>
+      </div>
+      <div class="box" style="text-align:center">
+        <div class="tag">C 보드</div>
+        <h3 style="margin:8px 0 4px">탁상용 선풍기</h3>
+        <p style="font-size:9pt; color:#555; margin:0">LED · 선풍기 · 서보 · 초음파<br>거리/환경 기반 자동 제어</p>
       </div>
     </div>
+    <div class="note"><b>핵심 설계:</b> 역할이 다른 세 ESP32 보드를 ESP-NOW로 연결해,
+    인터넷·연산은 B가 전담, A는 표시만, C는 액추에이터 제어만 담당하는 <b>역할 분리 구조</b>입니다.</div>
   </section>
-  <div class="footer">DualCore Smart Display — 2 / 6</div>
+  <div class="footer">발표 참고자료 — 2 / 14</div>
 </div>
 
-<!-- ════ 페이지 3 ════ -->
+<!-- ════ 페이지 3 : 개요 + 문제 정의 ════ -->
 <div class="page">
   <section class="no-break">
-    <h2 class="sec"><span class="n">03</span>시스템 아키텍처</h2>
-    <p>인터넷 데이터가 B보드를 거쳐 ESP-NOW로 A보드에 전달되고, 최종적으로 e-paper에 표시됩니다.</p>
+    <h2 class="sec"><span class="n">02</span>프로젝트 개요 &amp; 문제 정의</h2>
+    <h3>출발점 — 종이 캘린더의 한계</h3>
+    <p>기존 종이 캘린더는 날짜와 일정만을 정적으로 표시할 뿐, 그날의 <b>날씨·미세먼지·온습도</b>
+    같은 실시간 환경 정보를 전혀 담지 못합니다. 또한 사용자가 직접 매달 종이를 넘기거나
+    글씨를 써넣어야 하며, 한 번 인쇄된 내용은 갱신이 불가능합니다.</p>
+
+    <h3>그렇다면 LCD/태블릿으로 대체하면?</h3>
+    <ul class="clean">
+      <li>정보를 항상 띄워두려면 <b>전력 소모가 커서</b> 배터리로 오래 운용 불가</li>
+      <li>발광형 화면이라 <b>눈 피로</b>가 누적되고 종이 같은 자연스러운 가독성이 없음</li>
+      <li>매번 사람이 직접 앱을 켜야 하므로 <b>"고개만 돌리면 항상 보이는 즉시성"</b> 상실</li>
+    </ul>
+
+    <h3>핵심 문제 정의</h3>
+    <div class="highlight">
+    "종이 캘린더처럼 <b>전력 없이도 항상 정보가 떠 있고 눈이 편안</b>하면서도,
+    종이 캘린더가 하지 못하는 <b>실시간 날씨·환경 정보 갱신과 자동화</b>를
+    저전력 제약 안에서 어떻게 동시에 구현할 것인가?"
+    </div>
+
+    <h3>해결 방향 — 두뇌와 표시의 역할 분리</h3>
+    <div class="grid2">
+      <div class="box">
+        <b>A 보드 (표시 단말)</b>
+        <p style="margin:6px 0 0">종이의 장점은 살리고 한계는 극복하는 <b>e-paper 디스플레이</b>.
+        쌍안정성 + Deep Sleep으로 1회 충전 후 약 1년 운용.</p>
+      </div>
+      <div class="box">
+        <b>B 보드 (두뇌/게이트웨이)</b>
+        <p style="margin:6px 0 0">저전력 단말을 대신해 <b>인터넷·클라우드·환경 데이터</b>를
+        책임지는 상시 동작 노드. A·C 두 단말에 정보를 공급.</p>
+      </div>
+    </div>
+  </section>
+  <div class="footer">발표 참고자료 — 3 / 14</div>
+</div>
+
+<!-- ════ 페이지 4 : 관련 기술 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">03</span>관련 기술 현황</h2>
+
+    <h3>E-Paper (전자종이) — 원리</h3>
+    <p>전기영동(Electrophoretic Display) 방식의 화면은 수많은 <b>마이크로캡슐</b>로 채워져 있고,
+    각 캡슐 안에는 <b>음(−) 전하 흰색 입자</b>와 <b>양(+) 전하 검은색 입자</b>가 떠 있습니다.
+    전극으로 전기장을 걸어 흰 입자를 올리면 흰색, 검은 입자를 올리면 검은색으로 보입니다.</p>
+    <div class="highlight"><b>쌍안정성(Bistability):</b> 한 번 입자를 이동시키면 전원을 꺼도 그 자리에
+    그대로 머뭅니다. → <b>화면을 바꿀 때만</b> 전기가 필요하고, <b>보여주는 동안에는 전기가 거의 들지 않음</b>.</div>
+
+    <h3>ESP-NOW — Espressif의 커넥션리스 통신</h3>
+    <table>
+      <tr><th>항목</th><th>특성</th></tr>
+      <tr><td>구조</td><td>OSI 5개 상위 계층을 데이터링크 계층 하나로 축약, 라우터 불필요</td></tr>
+      <tr><td>송신 전력</td><td>최대 +21 dBm (개활지 약 200m)</td></tr>
+      <tr><td>지연</td><td>약 150ms 이내</td></tr>
+      <tr><td>공존</td><td>WiFi / BLE 와 공존 가능</td></tr>
+      <tr><td>보안</td><td>ECDH · AES 기반 암호화 지원</td></tr>
+      <tr><td>저전력</td><td>윈도우 동기화(window synchronization)로 저전력 동작</td></tr>
+    </table>
+
+    <h3>외부 API</h3>
+    <div class="grid2">
+      <div class="box"><b>Open-Meteo</b>
+      <p style="margin:6px 0 0; font-size:9.5pt">전 세계 기상 예보 제공 오픈소스 무료 API.
+      <b>비상업 용도에 한해 API 키 불필요</b> → 가입·인증 없이 즉시 호출 가능.</p></div>
+      <div class="box"><b>Gemini API</b>
+      <p style="margin:6px 0 0; font-size:9.5pt">구글의 LLM(Gemini)을 HTTP 요청으로 호출해
+      텍스트를 생성받는 클라우드 서비스. 본 시스템은 날씨 수치를 <b>한 줄 생활 조언</b>으로 변환.</p></div>
+    </div>
+  </section>
+  <div class="footer">발표 참고자료 — 4 / 14</div>
+</div>
+
+<!-- ════ 페이지 5 : 상용 시스템 + 특허 + 논문 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">04</span>기존 상용 시스템 · 특허 · 논문</h2>
+
+    <h3>기존 상용 E-Paper 시스템</h3>
+    <div class="grid2">
+      <div class="box"><b>① 전자책 단말기</b>
+      <p style="margin:6px 0 0; font-size:9.5pt">전자종이의 가장 대중적인 응용. 종이책 같은 가독성과
+      며칠~몇 주 가는 배터리가 핵심 장점.</p></div>
+      <div class="box"><b>② 전자가격표시기(ESL)</b>
+      <p style="margin:6px 0 0; font-size:9.5pt">대형마트·편의점 매대에서 종이 가격표 대신 사용.
+      무선으로 일괄 변경 가능, 코인 배터리로 수년간 동작.</p></div>
+    </div>
+
+    <h3>관련 특허</h3>
+    <table>
+      <tr><th>특허</th><th>내용</th><th>본 시스템과의 관계</th></tr>
+      <tr>
+        <td><b>US5961804A</b><br>(MIT, 1997 출원/2017 만료)</td>
+        <td>Microencapsulated electrophoretic display — 전자종이 원천특허</td>
+        <td>권리 소멸로 기본 기술 자유 사용 가능</td>
+      </tr>
+      <tr>
+        <td><b>US20160259308A1</b><br>(Google/Nest 계열)</td>
+        <td>Smart-home automation system — 센서 기반 자동 제어</td>
+        <td>C 보드 AUTO 모드(센서값으로 출력 자동 결정)와 개념 일치</td>
+      </tr>
+      <tr>
+        <td><b>US7152040B1</b></td>
+        <td>Electronic shelf label — 서버가 무선으로 다수 저전력 단말 갱신</td>
+        <td>B→A e-paper 단말의 데이터 흐름과 매우 유사</td>
+      </tr>
+    </table>
+
+    <h3>관련 논문 — ESP-NOW 통신 프로토콜 비교</h3>
+    <p>IEEE Xplore <i>"Comparative Performance Study of ESP-NOW, Wi-Fi, Bluetooth Protocols
+    based on Range, Transmission Speed, Latency, Energy Usage and Barrier Resistance"</i>
+    (Doc. 9573246)에서 ESP-NOW가 <b>저부하 실시간 응답 시나리오</b>에서 WiFi/BLE 대비
+    <b>낮은 지연과 낮은 에너지 소비</b>를 실측으로 제시. 본 코드의 <b>채널 스캔·재시도 설계</b>의
+    정당성을 뒷받침합니다.</p>
+
+    <h3>분석표 요약</h3>
+    <table>
+      <tr><th>항목</th><th class="center">특허 A<br>(전자종이)</th><th class="center">특허 B<br>(ESL)</th><th class="center">논문 A<br>(ESP-NOW)</th><th class="center">특허 C<br>(스마트홈)</th></tr>
+      <tr><td>저전력성</td><td class="center">○</td><td class="center">○</td><td class="center">○</td><td class="center">×</td></tr>
+      <tr><td>통신 신뢰성</td><td class="center">×</td><td class="center">○</td><td class="center">○</td><td class="center">△</td></tr>
+      <tr><td>표시 가독성</td><td class="center">○</td><td class="center">○</td><td class="center">×</td><td class="center">×</td></tr>
+      <tr><td>자동화/지능화</td><td class="center">×</td><td class="center">×</td><td class="center">×</td><td class="center">○</td></tr>
+    </table>
+  </section>
+  <div class="footer">발표 참고자료 — 5 / 14</div>
+</div>
+
+<!-- ════ 페이지 6 : SCAMPER + 아이디어 평가 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">05</span>아이디어 창출 — SCAMPER</h2>
+    <div class="scamper">
+      <div class="card"><span class="letter">S</span><span class="title">Substitute (대체)</span>
+      <div class="body">종이 → <b>전자종이(e-paper)</b>로 대체. 가독성·전원 없는 표시 유지는 살리고
+      인쇄된 고정 내용은 무선 갱신 가능한 화면으로 전환. → <b>A 보드</b></div></div>
+
+      <div class="card"><span class="letter">C</span><span class="title">Combine (결합)</span>
+      <div class="body">날짜에 <b>날씨·미세먼지·온습도·AI 조언</b>을 한 화면에 결합. 이 정보 수집을
+      위해 인터넷·센서를 담당하는 B 보드가 필요해짐. → <b>A·B</b></div></div>
+
+      <div class="card"><span class="letter">A</span><span class="title">Adapt (응용)</span>
+      <div class="body">ESL의 "서버가 다수 저전력 단말 갱신" 구조를 가정용으로 응용. <b>게이트웨이-단말
+      분리 구조</b>의 직접적 근거. → <b>B·A</b></div></div>
+
+      <div class="card"><span class="letter">M</span><span class="title">Modify (수정)</span>
+      <div class="body">표시 단말의 전력 운용을 근본적으로 변경. 평소엔 <b>Deep Sleep</b>,
+      버튼/정해진 시각에만 깨어남. → <b>A</b></div></div>
+
+      <div class="card"><span class="letter">P</span><span class="title">Put to another use</span>
+      <div class="body">캘린더 단일 용도를 넘어 <b>날씨 대시보드·대기질 모니터·AI 비서</b>로
+      화면 모드 확장. 같은 HW로 다중 화면 제공. → <b>A</b></div></div>
+
+      <div class="card"><span class="letter">E</span><span class="title">Eliminate (제거)</span>
+      <div class="body">A에서 상시 WiFi·클라우드 호출 제거 → 모두 B로 이관. 라우터 의존 제거
+      → <b>ESP-NOW</b> 직접 통신 채택. → <b>A·B</b></div></div>
+
+      <div class="card" style="grid-column: 1/3"><span class="letter">R</span><span class="title">Reverse / Rearrange (역발상·재배치)</span>
+      <div class="body">"사람이 정보를 찾아가는 방식"을 <b>"정보가 사람에게 미리 준비되는 방식"</b>으로 뒤집음.
+      <code>wakeHour</code>에 단말이 스스로 깨어나 그날 정보를 미리 갱신, 날씨 수치를 사람이 해석하던 부담을
+      <b>AI 한 줄 조언</b>으로 재배치. → <b>B</b></div></div>
+    </div>
+  </section>
+
+  <section class="no-break">
+    <h2 class="sec" style="margin-top:18px"><span class="n">06</span>아이디어 평가</h2>
+    <table>
+      <tr>
+        <th>평가 항목</th><th class="center">가중치</th>
+        <th class="center">종이<br>캘린더</th>
+        <th class="center">일반 LCD</th>
+        <th class="center">E-Paper<br>(A+B)</th>
+      </tr>
+      <tr><td>정보 즉시성 (항상 표시)</td><td class="center">20%</td>
+        <td class="center"><span class="score s5">5</span></td>
+        <td class="center"><span class="score s3">3</span></td>
+        <td class="center"><span class="score s5">5</span></td></tr>
+      <tr><td>실시간 정보 갱신</td><td class="center">20%</td>
+        <td class="center"><span class="score s1">1</span></td>
+        <td class="center"><span class="score s5">5</span></td>
+        <td class="center"><span class="score s3">3</span></td></tr>
+      <tr><td>저전력 장기 운용</td><td class="center">20%</td>
+        <td class="center"><span class="score s5">5</span></td>
+        <td class="center"><span class="score s1">1</span></td>
+        <td class="center"><span class="score s4">4</span></td></tr>
+      <tr><td>가독성 (눈 편안함)</td><td class="center">10%</td>
+        <td class="center"><span class="score s5">5</span></td>
+        <td class="center"><span class="score s3">3</span></td>
+        <td class="center"><span class="score s5">5</span></td></tr>
+      <tr><td>정보 해석·실용성</td><td class="center">15%</td>
+        <td class="center"><span class="score s1">1</span></td>
+        <td class="center"><span class="score s5">5</span></td>
+        <td class="center"><span class="score s5">5</span></td></tr>
+      <tr><td>통신·동작 신뢰성</td><td class="center">10%</td>
+        <td class="center"><span class="score s5">5</span></td>
+        <td class="center"><span class="score s4">4</span></td>
+        <td class="center"><span class="score s4">4</span></td></tr>
+      <tr><td>경제성</td><td class="center">5%</td>
+        <td class="center"><span class="score s5">5</span></td>
+        <td class="center"><span class="score s3">3</span></td>
+        <td class="center"><span class="score s3">3</span></td></tr>
+      <tr style="background:#f0f0f0; font-weight:700">
+        <td>가중 합계 (5점 만점)</td><td class="center">100%</td>
+        <td class="center">3.60</td>
+        <td class="center">3.10</td>
+        <td class="center" style="color:#b03030">3.90 ★</td></tr>
+    </table>
+    <div class="note"><b>결론:</b> E-Paper(A+B) 방식이 종합 최우수. 종이의 즉시성·저전력·가독성을
+    유지하면서도 실시간 갱신과 AI 해석을 추가할 수 있음.</div>
+  </section>
+  <div class="footer">발표 참고자료 — 6 / 14</div>
+</div>
+
+<!-- ════ 페이지 7 : 시스템 구성도 + 시나리오 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">07</span>시스템 구성도</h2>
     <div class="box">
       <div class="arch">
         <div class="node"><div class="t">Internet</div><div class="d">Open-Meteo<br>Gemini · NTP</div></div>
-        <span class="arrow">&rarr;</span>
-        <div class="node"><div class="t">B 보드</div><div class="d">WiFi · API<br>센서 · 웹설정</div></div>
-        <span class="arrow">&hArr;</span>
-        <div class="node"><div class="t">A 보드</div><div class="d">Deep Sleep<br>렌더링</div></div>
-        <span class="arrow">&rarr;</span>
-        <div class="node"><div class="t">e-Paper</div><div class="d">캘린더/날씨<br>대기질/AI</div></div>
+        <span class="arrow">→</span>
+        <div class="node" style="border-color:#b03030"><div class="t">B 보드 (허브)</div><div class="d">WiFi · API<br>센서 · 웹설정</div></div>
+      </div>
+      <div class="arch" style="margin-top:4px">
+        <div class="node"><div class="t">A 보드</div><div class="d">E-Paper<br>Deep Sleep</div></div>
+        <span class="arrow">⇔</span>
+        <div class="node" style="border-color:#b03030"><div class="t">B 보드</div><div class="d">게이트웨이</div></div>
+        <span class="arrow">⇔</span>
+        <div class="node"><div class="t">C 보드</div><div class="d">LED · 선풍기<br>서보 · 초음파</div></div>
       </div>
       <p style="text-align:center; color:#666; margin:6px 0 0; font-size:9.5pt">
-      B↔A 사이는 WiFi가 아닌 <b>ESP-NOW</b>(저전력 P2P)로 직접 통신 · B가 사용하는 채널을 A가 스캔</p>
+      인터넷에 연결되는 보드는 <b>B 하나뿐</b>. A·C는 ESP-NOW로 B를 통해서만 데이터 획득</p>
     </div>
   </section>
 
   <section class="no-break">
-    <h2 class="sec"><span class="n">04</span>통신 프로토콜 (ESP-NOW)</h2>
-    <p>두 보드는 동일한 구조체와 메시지 타입을 공유하며, 수신 측은 <b>패킷 크기</b>로 종류를 구분합니다.</p>
+    <h2 class="sec"><span class="n">08</span>사용자 시나리오</h2>
+    <ol class="seq">
+      <li><b>아침 자동 기상 (A ↔ B)</b>
+      <p style="margin:4px 0 0">사용자가 설정한 기상 시각(기본 7시, <code>wakeHour</code>)이 되면 A 보드가 스스로
+      Deep Sleep에서 깨어남 → B에 날짜·날씨·미세먼지·AI 멘트를 요청 → 화면 갱신 후 다시 잠듦.
+      <b>"사용자가 정보를 찾으러 가는 것이 아니라 정보가 미리 준비되어 있는 것"</b>이 핵심 경험.</p></li>
+
+      <li><b>평상시 화면 확인 — 수동 조작 (A ↔ B)</b>
+      <p style="margin:4px 0 0">날씨가 궁금해 버튼을 누르면 A가 즉시 깨어나 최신 데이터를 받아 갱신.
+      UP/DOWN으로 <b>캘린더 → 시간별 날씨 → 대기질+AI 멘트</b> 화면 전환, MENU로 일/월 보기 전환,
+      EXIT로 System Info(배터리·통신 채널·마지막 동기화 시각) 확인. <code>sleepTimeoutSec</code>(기본 10초) 동안
+      조작이 없으면 캘린더 화면으로 복귀 후 재진입.</p></li>
+
+      <li><b>게이트웨이가 꺼져 있을 때 — 통신 실패 폴백</b>
+      <p style="margin:4px 0 0">B의 전원이 꺼져 있어도 A는 마지막 성공 채널부터 1~13 채널을 스캔.
+      그래도 응답이 없으면 <b>RTC 메모리의 마지막 데이터</b>를 화면에 표시. 우측 상단에 <b>"CACHED" 배지</b>와
+      마지막 동기화 시각이 함께 표시되어 캐시 상태임을 명확히 알림.</p></li>
+
+      <li><b>설정 변경 — 웹 페이지 (B)</b>
+      <p style="margin:4px 0 0">스마트폰으로 B의 WiFi 웹 설정 페이지에 접속해 위치(위도·경도), 기상 시각,
+      화면 대기시간, AI 멘트 on/off 등을 변경. B는 NVS에 저장하면서 <code>configVersion</code>을 +1.
+      다음 요청 시 A가 새 설정을 받음. → <b>단말을 직접 만지지 않고 한곳에서 모든 기기 설정 변경 가능</b>.</p></li>
+
+      <li><b>환경 자동 제어 — 선풍기 (C ↔ B)</b>
+      <p style="margin:4px 0 0">C는 두 가지 모드로 동작.
+      <br><b>Default 모드:</b> 초음파로 사람 접근 감지 → 설정된 출력(LED+팬 / 팬만 / LED만)에 따라 동작.
+      조이스틱으로 팬·조명 방향 조절, 버튼 길게 누르면 가장 가까운 대상으로 자동 정렬.
+      <br><b>AUTO 모드:</b> B의 온도(≥28°C)·조도·PIR 값 기준으로 자동 켜짐.
+      B와 10초 이상 통신 끊기면 <b>페일세이프</b>로 모든 출력 OFF.</p></li>
+    </ol>
+  </section>
+  <div class="footer">발표 참고자료 — 7 / 14</div>
+</div>
+
+<!-- ════ 페이지 8 : A 보드 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">09</span>A 보드 — E-Paper 디스플레이</h2>
+
+    <h3>동작 원리</h3>
+    <p>평소 Deep Sleep 상태이며 버튼(EXT0/EXT1 wakeup) 또는 타이머로 깨어남.
+    깨어나면 <b>채널 자동 스캔</b>으로 B를 찾아 <code>MSG_REQUEST</code>(센서·날씨)와
+    <code>MSG_AI_REQUEST</code>(AI 멘트)를 전송. B의 응답을 받아 e-paper에 표시하고
+    RTC 메모리에 캐시한 뒤 다시 잠듦.</p>
+
+    <h3>핀 매핑 — A 보드 (입력/제어)</h3>
     <table>
-      <tr><th>타입</th><th>값</th><th>방향</th><th>설명</th></tr>
-      <tr><td>MSG_REQUEST</td><td>0</td><td>A → B</td><td>센서 데이터 요청</td></tr>
-      <tr><td>MSG_SENSOR_DATA</td><td>1</td><td>B → A</td><td>센서·시간·날씨·설정 응답</td></tr>
-      <tr><td>MSG_AI_REQUEST</td><td>2</td><td>A → B</td><td>AI 멘트 요청</td></tr>
-      <tr><td>MSG_AI_CHUNK</td><td>3</td><td>B → A</td><td>AI 멘트 분할 전송</td></tr>
+      <tr><th>분류</th><th>신호명</th><th>GPIO</th><th>연결</th><th>비고</th></tr>
+      <tr><td rowspan="3">E-Paper</td><td>CS / DC / RST</td><td>45 / 46 / 47</td><td>4.2" e-Paper</td><td>SPI 제어</td></tr>
+      <tr><td>BUSY</td><td>48</td><td>e-Paper BUSY</td><td>입력</td></tr>
+      <tr><td>EPD_PWR</td><td>7</td><td>전원 제어</td><td>출력</td></tr>
+      <tr><td>버튼</td><td>BTN ×5</td><td>1, 2, 4, 5, 6</td><td>UP/DOWN/OK/MENU/EXIT</td><td>EXT wakeup</td></tr>
+      <tr><td>해상도</td><td>—</td><td>—</td><td>400 × 300</td><td>흑백 반사형</td></tr>
     </table>
 
-    <h3>AIChunk — 청크 분할 전송</h3>
-    <p>AI 멘트는 ESP-NOW 패킷 크기 제한 때문에 <b>200바이트 단위(최대 4조각)</b>로 나눠 전송하고,
-    A보드가 인덱스를 보고 재조립합니다.</p>
+    <h3>화면 모드</h3>
+    <div class="grid3">
+      <div class="box" style="text-align:center"><b>Calendar</b>
+      <p style="margin:6px 0 0; font-size:9pt; color:#555">일(day) / 월(month) 보기<br>MENU로 전환</p></div>
+      <div class="box" style="text-align:center"><b>Weather</b>
+      <p style="margin:6px 0 0; font-size:9pt; color:#555">6시간대 예보<br>아이콘 + 온도</p></div>
+      <div class="box" style="text-align:center"><b>Air / Env</b>
+      <p style="margin:6px 0 0; font-size:9pt; color:#555">종합 대기질<br>+ AI 한 줄 조언</p></div>
+    </div>
+
+    <h3>렌더링 &amp; 전력 관리</h3>
+    <ul class="clean">
+      <li><b>부분 갱신</b>으로 빠르게 그리되, <code>fullRefreshEvery</code>마다 <b>전체 갱신</b>으로 잔상 제거</li>
+      <li>날씨 코드별 24×24 아이콘(맑음/구름/비/눈/안개/뇌우)과 AI 멘트 워드랩 표시</li>
+      <li>Deep Sleep 진입 직전, 화면 <b>좌측 상단 작은 점</b>으로 슬립 상태 표시 (부분 갱신)</li>
+    </ul>
+
+    <h3>다음 기상 시각(<code>wakeHour</code>) 계산</h3>
+    <pre><code>if (hour &lt; wakeHour)            // 오늘 아직 기상 시각 전
+  sec = (wakeHour - hour) * 3600 - minute * 60;
+else                            // 이미 지남 → 다음 날 기상
+  sec = (24 - hour + wakeHour) * 3600 - minute * 60;
+
+if (sec &lt;= 0) sec = 3600;       // 안전장치: 최소 1시간</code></pre>
+    <p style="font-size:9.5pt; color:#555">예) <code>wakeHour=7</code>, 현재 22:30 → 다음 날 07:00까지
+    약 8시간 30분 후 기상. NTP 동기화 안 된 상태면 기본 24시간 주기.</p>
+  </section>
+  <div class="footer">발표 참고자료 — 8 / 14</div>
+</div>
+
+<!-- ════ 페이지 9 : B 보드 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">10</span>B 보드 — 게이트웨이</h2>
+
+    <h3>핵심 기능</h3>
+    <div class="grid2">
+      <div class="box"><b>WiFi &amp; AP 모드</b>
+      <p style="margin:6px 0 0; font-size:9.5pt">저장된 자격증명으로 접속, 실패 시
+      <code>DualCore-Setup</code> AP를 띄워 웹 설정 수신.</p></div>
+      <div class="box"><b>외부 API 호출</b>
+      <p style="margin:6px 0 0; font-size:9.5pt">Open-Meteo(날씨), Air Quality(대기질),
+      Gemini(생활 조언 1줄)를 호출.</p></div>
+      <div class="box"><b>NTP 동기화</b>
+      <p style="margin:6px 0 0; font-size:9.5pt">한국 시간(KST, GMT+9)으로 시각을 맞추고
+      A·C 보드에 함께 전달.</p></div>
+      <div class="box"><b>웹 설정 페이지</b>
+      <p style="margin:6px 0 0; font-size:9.5pt">위치·기상시각·타임아웃·AI on/off 변경 및
+      공장 초기화 제공. NVS에 저장.</p></div>
+    </div>
+
+    <h3>핀 매핑 — B 보드 (센서/표시)</h3>
+    <table>
+      <tr><th>분류</th><th>신호명</th><th>GPIO</th><th>연결</th><th>비고</th></tr>
+      <tr><td>센서</td><td>PIN_DHT</td><td>1</td><td>DHT11 데이터</td><td>온습도</td></tr>
+      <tr><td>센서</td><td>PIN_LIGHT</td><td>2</td><td>조도 센서</td><td>analogRead, 12bit</td></tr>
+      <tr><td>센서</td><td>PIN_PIR</td><td>3</td><td>PIR 모션 센서</td><td>디지털 입력</td></tr>
+      <tr><td>OLED</td><td>SDA / SCL</td><td>17 / 18</td><td>SSD1306</td><td>상태 표시</td></tr>
+      <tr><td>전원</td><td>VEXT</td><td>36</td><td>외부 전원 제어</td><td>—</td></tr>
+    </table>
+
+    <h3>AI 멘트 생성 (Gemini)</h3>
+    <p>오늘의 기상·대기질을 프롬프트로 넣어 <b>영어 18단어 이내 생활 팁</b>을 하루 1회 생성하고
+    NVS에 저장 → 재부팅 후에도 유지. ESP-NOW 250바이트 제약 때문에
+    <b>200바이트씩 최대 4개의 <code>MSG_AI_CHUNK</code></b>로 분할 전송.</p>
+
     <pre><code>typedef struct {
   uint8_t  msgType;       // MSG_AI_CHUNK
   uint8_t  totalChunks;   // 전체 조각 수
@@ -247,234 +592,262 @@
   uint8_t  commentDay;    // 멘트 생성 날짜
   char     data[200];     // 조각 데이터
 } AIChunk;</code></pre>
-    <p>A보드는 최대 <b>3회 재시도</b>하며, 응답이 없으면 RTC 메모리의 <b>캐시 데이터</b>를 사용합니다.</p>
+
+    <div class="note"><b>역할 정리:</b> "B 보드는 인터넷·API·AI·시각·웹 설정을 모두 담당하는 두뇌"이며,
+    A 보드는 화면만, C 보드는 액추에이터 제어만 맡습니다. B의 상시 동작 덕분에 A는 1년 운용이 가능합니다.</div>
   </section>
-  <div class="footer">DualCore Smart Display — 3 / 6</div>
+  <div class="footer">발표 참고자료 — 9 / 14</div>
 </div>
 
-<!-- ════ 페이지 4 ════ -->
+<!-- ════ 페이지 10 : C 보드 ════ -->
 <div class="page">
   <section class="no-break">
-    <h2 class="sec"><span class="n">05</span>B 보드 — 게이트웨이</h2>
-    <div class="grid2">
-      <div class="box"><h3 style="margin:0 0 4px">WiFi &amp; AP 모드</h3>
-      저장된 자격증명으로 접속하고, 실패 시 <code>DualCore-Setup</code> AP를 띄워 웹 설정을 받습니다.</div>
-      <div class="box"><h3 style="margin:0 0 4px">외부 API</h3>
-      Open-Meteo(날씨), Air Quality(대기질), Gemini(생활 조언 1줄)를 호출합니다.</div>
-      <div class="box"><h3 style="margin:0 0 4px">NTP 동기화</h3>
-      한국 시간(KST, GMT+9)으로 시각을 맞추고 A보드에 함께 전달합니다.</div>
-      <div class="box"><h3 style="margin:0 0 4px">웹 설정 페이지</h3>
-      위치·기상시각·타임아웃·AI on/off 변경 및 공장 초기화를 제공합니다.</div>
-    </div>
-    <h3>AI 멘트 생성 (Gemini)</h3>
-    <p>오늘의 기상·대기질을 프롬프트로 넣어 <b>영어 18단어 이내 생활 팁</b>을 하루 1회 생성하고
-    NVS에 저장해 재부팅 후에도 유지합니다.</p>
-  </section>
+    <h2 class="sec"><span class="n">11</span>C 보드 — 탁상용 선풍기 (추가)</h2>
 
-  <section class="no-break">
-    <h2 class="sec"><span class="n">06</span>A 보드 — e-paper 디스플레이</h2>
-    <h3>화면 모드</h3>
-    <p><b>Calendar</b>(일/월 보기) · <b>Weather</b>(6시간대 예보) · <b>Air/Env</b>(종합+AI 멘트).
-    UP/DOWN으로 모드 전환, OK로 새로고침, EXIT로 시스템 Info 진입.</p>
-    <h3>렌더링 & 전력 관리</h3>
-    <ul class="clean">
-      <li><b>부분 갱신</b>으로 빠르게 그리되, <code>fullRefreshEvery</code>마다 <b>전체 갱신</b>으로 잔상 제거.</li>
-      <li>날씨 코드별 24×24 아이콘(맑음/구름/비/눈/안개/뇌우)과 AI 멘트 워드랩 표시.</li>
-      <li>입력이 없으면 캘린더 복귀 후 Deep Sleep, <code>wakeHour</code>까지 타이머로 기상.</li>
-    </ul>
+    <h3>C 보드를 추가한 이유</h3>
+    <p>A 보드를 통해 <b>소프트웨어적 설계와 Deep Sleep의 동작 원리</b>를 이해함. 특히 Deep Sleep 상태에서는
+    CPU·WiFi가 정지되어 외부로부터 인터럽트(데이터 수신)를 받을 수 없다는 한계를 직접 확인.
+    즉 A가 잠들어 있는 동안 외부에서 능동적으로 데이터를 밀어 넣을 수 없고, <b>A가 스스로 깨어나
+    요청하는 방식(pull)만 가능</b>하다는 점을 학습.</p>
 
-    <h3>다음 기상 시각(wakeHour) 계산</h3>
-    <p>NTP로 시간이 동기화된 상태라면, 현재 시각(<code>hour</code>:<code>minute</code>)에서
-    설정된 <b>기상 시각(<code>wakeHour</code>)까지 남은 초</b>를 계산해 타이머로 잠듭니다.
-    아직 오늘 기상 시각이 지나지 않았으면 오늘 기준, 이미 지났으면 다음 날 기준으로 계산합니다.</p>
-    <pre><code>if (hour &lt; wakeHour)            // 오늘 아직 기상 시각 전
-  sec = (wakeHour - hour) * 3600 - minute * 60;
-else                            // 이미 지남 → 다음 날 기상
-  sec = (24 - hour + wakeHour) * 3600 - minute * 60;
-
-if (sec &lt;= 0) sec = 3600;       // 안전장치: 최소 1시간</code></pre>
-    <p style="margin:6px 0 0">예) <code>wakeHour=7</code>, 현재 22:30 → 다음 날 07:00까지
-    약 8시간 30분 후 기상. 시간이 한 번도 동기화되지 않았으면 기본 24시간 주기로 기상합니다.</p>
-
-    <div class="note"><b>RTC 메모리 활용:</b> <code>RTC_DATA_ATTR</code> 변수로 시간·날씨·AI 멘트·설정을
-    Deep Sleep 동안 유지해, 통신 실패 시에도 마지막 데이터를 표시합니다.</div>
-  </section>
-  <div class="footer">DualCore Smart Display — 4 / 6</div>
-</div>
-
-<!-- ════ 페이지 5 ════ -->
-<div class="page">
-  <section class="no-break">
-    <h2 class="sec"><span class="n">07</span>설정 동기화 메커니즘</h2>
-    <p>B보드에서 바꾼 설정을 A보드에 안전하게 전파하기 위해 <b>버전 번호(<code>configVersion</code>)</b> 방식을 사용합니다.</p>
-    <ul class="clean">
-      <li>웹에서 설정 저장 시 B보드의 <code>configVersion</code>이 <b>1 증가</b>.</li>
-      <li>설정값은 매 센서 응답에 실려 A보드로 전달.</li>
-      <li>A보드는 받은 버전이 <b>현재 적용 버전보다 클 때만</b> 적용.</li>
-      <li>같은 설정이 반복 수신돼도 불필요한 갱신 없이 변경 시점만 정확히 반영.</li>
-    </ul>
-    <pre><code>// A보드 수신 콜백
-if (rxMsg.config.configVersion > lastCfgVersion) {
-  appliedCfg     = rxMsg.config;          // 새 설정 적용
-  lastCfgVersion = rxMsg.config.configVersion;
-}</code></pre>
-  </section>
-
-  <section class="no-break">
-    <h2 class="sec"><span class="n">08</span>동작 시나리오</h2>
-    <ol class="seq">
-      <li><b>B보드(상시 동작):</b> WiFi로 날씨·대기질을 가져와 센서값과 함께 저장하고,
-      Gemini에 AI 멘트를 요청해 NVS에 보관합니다. A보드의 요청을 항상 대기합니다.</li>
-      <li><b>A보드 기상 &amp; 데이터 수신:</b> 타이머 또는 버튼으로 Deep Sleep에서 깨어나
-      ESP-NOW로 B보드에 요청해 <b>센서·시간·날씨·대기질·설정</b>을 받고, Air/Env 모드면 <b>AI 멘트</b>도 수신합니다.</li>
-      <li><b>통신 실패 시 데이터 처리:</b> 재시도 후에도 응답이 없으면 각 값은 다음과 같이 불러옵니다.
-        <ul class="clean" style="margin:6px 0 0">
-          <li>시간·온습도·날씨·대기질 → RTC 메모리(<code>RTC_DATA_ATTR</code>)에 남은 <b>마지막 수신값(캐시)</b> 사용.</li>
-          <li>AI 멘트 → 같은 날짜의 캐시가 있으면 그대로 표시, 없으면 <b>"Requesting AI..."</b> 안내 표시.</li>
-          <li>설정값 → 직전에 적용된 <code>appliedCfg</code>(RTC 유지)를 그대로 사용.</li>
-        </ul>
-      </li>
-      <li><b>화면 렌더링:</b> 현재 모드(Calendar / Weather / Air-Env / Info)에 맞는 화면을 e-paper에 그립니다.</li>
-      <li><b>타임아웃 &amp; 복귀:</b> 웹서버에서 설정된 타임아웃(<code>sleepTimeoutSec</code>) 동안 입력이 없으면
-      어떤 화면에 있든 <b>캘린더 화면으로 복귀</b> 후 Deep Sleep에 재진입합니다.</li>
-      <li><b>슬립 표시:</b> Deep Sleep 진입 직전, 화면 <b>왼쪽 위에 작은 점(인디케이터)</b>을 부분 갱신으로 그려
-      현재 잠든 상태임을 표시합니다.</li>
-    </ol>
-  </section>
-  <div class="footer">DualCore Smart Display — 5 / 6</div>
-</div>
-
-<!-- ════ 페이지 6 ════ -->
-<div class="page">
-  <section class="no-break">
-    <h2 class="sec"><span class="n">09</span>빌드 &amp; 설정</h2>
-    <ul class="clean">
-      <li><b>라이브러리:</b> WiFi, esp_now, WebServer, Preferences, Adafruit_SSD1306, DHT, ArduinoJson, GxEPD2</li>
-      <li><b>MAC 매칭:</b> <code>peerMAC_A</code> / <code>peerMAC_B</code>를 상대 보드 실제 MAC으로 설정</li>
-      <li><b>ESP-NOW 채널 자동 탐색:</b> 고정 채널이 아니라 A보드가 <code>savedChannel</code>을 우선 시도하고,
-      실패 시 1~13 채널을 스캔해 B를 찾음. 성공한 채널은 RTC에 저장해 다음 부팅 때 우선 사용
-      (스캔 실패 시 폴백값은 <code>DEFAULT_CHANNEL</code> = 10)</li>
-      <li><b>Gemini API 키:</b> <code>GEMINI_API_KEY</code>에 본인 키 입력 (소스 노출 주의)</li>
-    </ul>
-  </section>
-
-  <section class="no-break">
-    <h2 class="sec"><span class="n">10</span>한계 &amp; 개선점</h2>
-    <ul class="clean">
-      <li><b>API 키 하드코딩:</b> 소스 노출 → NVS 저장 등으로 분리 권장.</li>
-      <li><b>AI 멘트 갱신:</b> 하루 1회 — 날씨 급변 반영이 늦을 수 있음.</li>
-      <li><b>ESP-NOW 비암호화:</b> 현재 <code>encrypt = false</code>, 필요 시 암호화 적용 가능.</li>
-      <li><b>고정 위치:</b> 좌표는 변경 가능하나 AI 프롬프트 도시명은 고정.</li>
-    </ul>
-  </section>
-  <div class="footer">DualCore Smart Display — 6 / 6</div>
-</div>
-
-<!-- ════ 페이지 7 — C보드 확장 ════ -->
-<div class="page">
-  <section class="no-break">
-    <h2 class="sec"><span class="n">11</span>C 보드 — 책상용 선풍기</h2>
-    <p>기존 A·B 2-보드 구성에 <b>C 보드(HG-ESP32 DevKit V4)</b>를 추가해, 거리·환경에 반응하는
-    <b>LED 조명과 선풍기(모터)</b>를 제어하는 액추에이터 노드를 구성했습니다. B보드를 <b>허브</b>로 하여
-    <code>A &harr; B</code>, <code>B &harr; C</code>의 두 ESP-NOW 링크가 동작하며, C는 B에 주기적으로
-    센서·설정을 요청합니다.</p>
-
-    <div class="box">
-      <div class="arch">
-        <div class="node"><div class="t">A 보드</div><div class="d">e-Paper<br>저전력</div></div>
-        <span class="arrow">&hArr;</span>
-        <div class="node"><div class="t">B 보드 (허브)</div><div class="d">WiFi·API·센서<br>웹 설정</div></div>
-        <span class="arrow">&hArr;</span>
-        <div class="node"><div class="t">C 보드</div><div class="d">LED·선풍기<br>서보·초음파</div></div>
-      </div>
-      <p style="text-align:center; color:#666; margin:6px 0 0; font-size:9.5pt">
-      B는 허브로서 A와 C 양쪽과 통신 · C는 <b>2초 주기</b>로 B에 센서/설정 요청 후 응답을 수신</p>
-    </div>
+    <div class="highlight"><b>학습 동기:</b> 위 내용을 통해 소프트웨어 설계는 이해했으나,
+    <b>모터·서보·초음파·LED 등 실제 액추에이터를 제어하는 하드웨어적 이해</b>가 부족하다고 느낌.
+    또한 B 보드가 단순 중계기를 넘어, 자신의 센서(온도·조도·PIR)를 <b>또 다른 노드인 C에게도 동시에
+    공급하는 진정한 의미의 허브</b>로 기능함을 보여주기 위해 C 보드 추가.</div>
 
     <h3>하드웨어 구성 (C 보드)</h3>
-    <div class="grid2">
-      <div>
-        <table>
-          <tr><th>부품</th><th>핀</th></tr>
-          <tr><td>NeoPixel LED (×10)</td><td>GPIO 4</td></tr>
-          <tr><td>초음파 TRIG / ECHO</td><td>13 / 14</td></tr>
-          <tr><td>DC 모터(선풍기)</td><td>IA25 / IB26</td></tr>
-        </table>
-      </div>
-      <div>
-        <table>
-          <tr><th>부품</th><th>핀</th></tr>
-          <tr><td>서보 Pan / Tilt</td><td>33 / 32</td></tr>
-          <tr><td>조이스틱 X / Y</td><td>34 / 35</td></tr>
-          <tr><td>조이스틱 버튼</td><td>GPIO 27</td></tr>
-        </table>
-      </div>
-    </div>
-    <div class="note"><b>역할 분리 유지:</b> C는 환경 센서를 직접 갖지 않고, 자동 모드 판단에 필요한
-    온도·조도·PIR 값을 <b>B보드로부터 수신</b>합니다. 조이스틱→서보(Pan/Tilt) 조작은 모드와 무관하게 항상 유지됩니다.</div>
-  </section>
-  <div class="footer">DualCore Smart Display — 7 / 8</div>
-</div>
+    <table>
+      <tr><th>분류</th><th>신호명</th><th>GPIO</th><th>연결</th><th>비고</th></tr>
+      <tr><td>LED</td><td>LED_PIN</td><td>4</td><td>NeoPixel WS2812 ×10</td><td>데이터</td></tr>
+      <tr><td>초음파</td><td>TRIG / ECHO</td><td>13 / 14</td><td>HC-SR04</td><td>거리 측정</td></tr>
+      <tr><td>팬 모터</td><td>MOTOR_IA / IB</td><td>25 / 26</td><td>L9110S</td><td>PWM, 방향 제어</td></tr>
+      <tr><td>조이스틱</td><td>JOY_SW / VRX / VRY</td><td>27 / 34 / 35</td><td>2축 조이스틱</td><td>INPUT_PULLUP / ADC</td></tr>
+      <tr><td>서보</td><td>SERVO_TILT / PAN</td><td>32 / 33</td><td>SG90 ×2</td><td>PWM 500~2400μs</td></tr>
+    </table>
 
-<!-- ════ 페이지 8 — C보드 동작/프로토콜 ════ -->
-<div class="page">
-  <section class="no-break">
-    <h2 class="sec"><span class="n">12</span>C 보드 동작 모드</h2>
-    <p>C 보드는 B보드 웹 설정 페이지에서 선택하는 <b>두 가지 동작 모드</b>를 가집니다.
-    모드와 출력 설정은 ESP-NOW 응답에 실려 전달되며, A보드와 동일한 <b>버전 번호 방식</b>으로 변경 시점만 반영합니다.</p>
-
+    <h3>두 가지 동작 모드</h3>
     <div class="grid2">
       <div class="box"><span class="tag">Default</span><b>거리 기반 (초음파)</b>
-      <p style="margin:8px 0 0">초음파로 측정한 거리가 트리거 범위 안에 들어오면 출력을 켭니다.
-      무엇을 켤지는 웹에서 <b>LED+선풍기 / 선풍기만 / LED만</b> 중 선택할 수 있습니다.</p></div>
+      <p style="margin:6px 0 0; font-size:9.5pt">초음파 거리가 트리거 범위 안에 들어오면 출력 ON.
+      웹에서 <b>LED+팬 / 팬만 / LED만</b> 중 선택.</p></div>
       <div class="box"><span class="tag">Auto</span><b>환경 기반 (B 센서)</b>
-      <p style="margin:8px 0 0">초음파 거리와 무관하게, B의 <b>온도·조도·PIR</b> 값을 보고 자동으로 켜고 끕니다.
-      사람이 감지될 때만 동작하여 불필요한 작동을 막습니다.</p></div>
+      <p style="margin:6px 0 0; font-size:9.5pt">B의 온도·조도·PIR 값으로 자동 제어.
+      사람이 감지될 때만 동작.</p></div>
     </div>
 
     <h3>자동 모드 판단 규칙</h3>
     <table>
       <tr><th>출력</th><th>켜지는 조건</th></tr>
-      <tr><td>선풍기</td><td>온도 ≥ 28&#8451; <b>그리고</b> PIR 사람 감지</td></tr>
+      <tr><td>선풍기</td><td>온도 ≥ 28°C <b>그리고</b> PIR 사람 감지</td></tr>
       <tr><td>LED</td><td>조도 어두움(임계값 이하) <b>그리고</b> PIR 사람 감지</td></tr>
-      <tr><td>둘 다 OFF</td><td>사람 미감지 시, 또는 B 데이터 수신이 일정 시간 끊겼을 때</td></tr>
+      <tr><td>둘 다 OFF</td><td>사람 미감지 시, <b>또는 B 통신 10초 이상 끊김 (페일세이프)</b></td></tr>
     </table>
 
-    <h3>출력 선택 (Default 모드)</h3>
+    <p style="font-size:9.5pt; color:#555; margin-top:10px"><b>특이사항:</b> 조이스틱→서보(Pan/Tilt) 조작은
+    모드와 무관하게 항상 작동. 조이스틱 버튼 길게 누르면 초음파 스캔으로 <b>가장 가까운 대상 방향으로 자동 정렬</b>.</p>
+  </section>
+  <div class="footer">발표 참고자료 — 10 / 14</div>
+</div>
+
+<!-- ════ 페이지 11 : 통신 프로토콜 + 설정 동기화 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">12</span>ESP-NOW 통신 프로토콜</h2>
+    <p>세 보드는 동일한 구조체를 공유하며, 수신 측은 <b>패킷 크기와 msgType</b>으로 종류를 구분.
+    A·C 메시지가 충돌하지 않도록 C 전용 타입은 10·11번으로 분리.</p>
     <table>
-      <tr><th>값</th><th>상수</th><th>동작</th></tr>
-      <tr><td>0</td><td>OUT_BOTH</td><td>LED + 선풍기 (기본값)</td></tr>
-      <tr><td>1</td><td>OUT_FAN</td><td>선풍기만</td></tr>
-      <tr><td>2</td><td>OUT_LED</td><td>LED만</td></tr>
+      <tr><th>타입</th><th class="center">값</th><th class="center">방향</th><th>설명</th></tr>
+      <tr><td>MSG_REQUEST</td><td class="center">0</td><td class="center">A → B</td><td>센서 데이터 요청</td></tr>
+      <tr><td>MSG_SENSOR_DATA</td><td class="center">1</td><td class="center">B → A</td><td>센서·시간·날씨·설정 응답</td></tr>
+      <tr><td>MSG_AI_REQUEST</td><td class="center">2</td><td class="center">A → B</td><td>AI 멘트 요청</td></tr>
+      <tr><td>MSG_AI_CHUNK</td><td class="center">3</td><td class="center">B → A</td><td>AI 멘트 분할 전송 (4×200B)</td></tr>
+      <tr><td>MSG_C_REQUEST</td><td class="center">10</td><td class="center">C → B</td><td>C 전용 센서·설정 요청</td></tr>
+      <tr><td>MSG_C_DATA</td><td class="center">11</td><td class="center">B → C</td><td>온도·조도·PIR + C 설정 응답</td></tr>
+    </table>
+
+    <h3>채널 자동 탐색</h3>
+    <p>A·C 모두 고정 채널이 아니라 <b>RTC에 저장된 마지막 성공 채널</b>을 우선 시도하고,
+    실패하면 1~13 채널을 스캔해 B를 찾음. 성공한 채널은 다시 RTC에 저장.
+    스캔 실패 시 폴백값은 <code>DEFAULT_CHANNEL = 10</code>.</p>
+  </section>
+
+  <section class="no-break">
+    <h2 class="sec"><span class="n">13</span>설정 동기화 메커니즘 (Version 방식)</h2>
+    <p>B에서 바꾼 설정을 A·C에 안전하게 전파하기 위해 <b>버전 번호(<code>configVersion</code>)</b> 사용.</p>
+    <ul class="clean">
+      <li>웹에서 설정 저장 시 B의 <code>configVersion</code>이 <b>+1</b></li>
+      <li>설정값은 매 센서 응답에 실려 A·C로 전달</li>
+      <li>A·C는 받은 버전이 <b>현재 적용 버전보다 클 때만</b> 적용</li>
+      <li>같은 설정이 반복 수신돼도 불필요한 갱신 없이 <b>변경 시점만 정확히 반영</b></li>
+    </ul>
+    <pre><code>// A·C 보드 공통 수신 콜백
+if (rxMsg.config.configVersion &gt; lastCfgVersion) {
+  appliedCfg     = rxMsg.config;          // 새 설정 적용
+  lastCfgVersion = rxMsg.config.configVersion;
+}</code></pre>
+
+    <div class="note"><b>왜 버전 방식인가?</b> ESP-NOW는 무선 통신이라 같은 패킷이 여러 번 도착하거나
+    순서가 바뀔 수 있습니다. 버전 비교로 멱등성(idempotency)을 확보해 설정이 의도치 않게 되돌아가는
+    현상을 막습니다.</div>
+  </section>
+  <div class="footer">발표 참고자료 — 11 / 14</div>
+</div>
+
+<!-- ════ 페이지 12 : 구현 결과 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">14</span>구현 결과 — 화면 / 동작</h2>
+
+    <h3>A 보드 (E-Paper)</h3>
+    <ul class="clean">
+      <li>어떤 화면에서든 <b>10초 동안 동작 없으면</b> 기본 날짜 화면으로 복귀 후 Deep Sleep</li>
+      <li>왼쪽 위 검은 점으로 <b>Sleep 상태 여부</b>를 시각화</li>
+      <li>B에서 측정한 온도·습도 센서 표시 / 날씨 및 대기질 / 간단한 날씨 요약 문구</li>
+      <li>모든 정보는 A가 처리하지 않고 <b>B에서 가져옴</b> — A는 화면 렌더링만</li>
+      <li>기본 화면은 월간 캘린더 뷰, 외부 API를 활용한 시간별 날씨 모드 제공</li>
+    </ul>
+
+    <h3>B 보드 (게이트웨이)</h3>
+    <ul class="clean">
+      <li>외부 API로 날씨 및 대기질 정보 수집</li>
+      <li>외부 API 수치를 Gemini에 보내 <b>간단한 날씨 요약 문구를 자동 생성</b></li>
+      <li>WiFi 웹 접속으로 A·B·C 설정 변경 가능</li>
+      <li>A·C 요청 대기 후 모든 정보를 가공해 응답</li>
+    </ul>
+
+    <h3>C 보드 (탁상용 선풍기)</h3>
+    <ul class="clean">
+      <li>초음파 스캔 후 <b>가장 가까운 방향을 바라보도록</b> 서보 정렬</li>
+      <li>가장 가까운 거리를 저장, 트리거 거리 안으로 들어오면 켜짐</li>
+      <li>가까이 가면 켜지고 멀어지면 꺼짐 (Default 모드)</li>
+    </ul>
+
+    <h3>동작 영상 (YouTube Shorts)</h3>
+    <table>
+      <tr><th>내용</th><th>링크</th></tr>
+      <tr><td>A 보드 자동 기상 및 날짜 변경</td>
+        <td><code>youtube.com/shorts/PSg_g3vpkMU</code></td></tr>
+      <tr><td>C 보드 동작 — 가까운 거리 인식</td>
+        <td><code>youtube.com/shorts/GsqZDVRT7vI</code></td></tr>
+      <tr><td>C 보드 동작 — 거리 안 없을 경우 OFF</td>
+        <td><code>youtube.com/shorts/xn5pVVI_fzg</code></td></tr>
+    </table>
+
+    <h3>소스 코드 저장소</h3>
+    <p><code>https://github.com/noctis-03/microprocessorrr.git</code></p>
+  </section>
+  <div class="footer">발표 참고자료 — 12 / 14</div>
+</div>
+
+<!-- ════ 페이지 13 : 성능 평가 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">15</span>성능 평가 — 전력 소모 추정</h2>
+
+    <div class="note"><b>주의:</b> 아래 내용은 성능 실험을 진행할 경우 적용할 수 있는 측정 방법에 대해 논하며,
+    <b>성능 실험은 예상 전력 소모량 계산으로 대체</b>하였습니다.</div>
+
+    <h3>실험 구성</h3>
+    <p>A 보드에 리튬 배터리(기준 용량 3000mAh 가정)를 연결하고, USB 전류계 또는 멀티미터를
+    전원 라인에 직렬로 연결해 세 가지 상태의 전류를 측정.</p>
+
+    <h3>측정 결과 (추정)</h3>
+    <table>
+      <tr><th>동작 상태</th><th>전류 소비</th><th>지속 시간 (1회)</th><th>비고</th></tr>
+      <tr><td>Deep Sleep 대기</td><td>약 20~100 µA</td><td>하루 대부분</td><td>전류계 직렬 측정</td></tr>
+      <tr><td>Wakeup + ESP-NOW 통신</td><td>약 80~120 mA</td><td>약 1~5초</td><td>통신 구간 평균 전류</td></tr>
+      <tr><td>전자종이 갱신 (부분)</td><td>약 20~30 mA</td><td>약 0.3~1초</td><td>갱신 구간 측정</td></tr>
+      <tr><td>전자종이 갱신 (전체)</td><td>약 20~30 mA</td><td>약 2~3초</td><td>15회마다 1회 발생</td></tr>
+      <tr><td>정지 화면 유지</td><td>약 0 µA</td><td>—</td><td>전원 무관 (쌍안정성)</td></tr>
+    </table>
+
+    <h3>하루 소비 전력량 계산</h3>
+    <div class="box">
+      <p style="margin:0"><b>사용 패턴 가정:</b> 하루 6회 깨어남 (정기 1회 + 수동 5회), 한 번에 약 15초 활성</p>
+      <p style="margin:6px 0 0"><b>활성 소비:</b> 100 mA × (6 × 15초 ÷ 3600) ≈ <b>2.5 mAh</b></p>
+      <p style="margin:6px 0 0"><b>대기 소비:</b> 0.05 mA × 23.97h ≈ <b>1.2 mAh</b></p>
+      <p style="margin:6px 0 0"><b>하루 총 소비:</b> 약 <b>3.7 mAh</b></p>
+      <p style="margin:6px 0 0; color:#b03030"><b>이론 수명:</b> 3000 mAh ÷ 3.7 ≈ <b>약 810일 (≈ 2.2년)</b></p>
+      <p style="margin:6px 0 0; font-size:9pt; color:#555">자가방전·효율 손실·온도 등을 고려한 안전계수 적용해도
+      <b>약 1년 이상의 운용</b>이 가능하다는 결론.</p>
+    </div>
+
+    <h3>정량 평가 — 종이 캘린더 vs 본 시스템</h3>
+    <table>
+      <tr><th>비교 항목</th><th>종이 캘린더</th><th>본 시스템 (A 보드)</th></tr>
+      <tr><td>현재 날짜 표시</td><td>불가능</td><td>가능</td></tr>
+      <tr><td>표시 가능 정보</td><td>날짜·일정</td><td>날짜·날씨·대기질·온습도·AI 멘트</td></tr>
+      <tr><td>실시간 정보 갱신</td><td>불가능</td><td>가능</td></tr>
+      <tr><td>사용자 수동 관리</td><td>월 1회 페이지 넘기기</td><td>0회 (자동 기상 갱신)</td></tr>
+      <tr><td>전력 소비 (상시 표시)</td><td>0</td><td>약 3.7 mAh/일</td></tr>
+      <tr><td>무충전 운용 기간</td><td>무한 (종이)</td><td>약 1년 이상</td></tr>
+      <tr><td>정보 해석·조언</td><td>불가능</td><td>AI 한 줄 조언 제공</td></tr>
+    </table>
+  </section>
+  <div class="footer">발표 참고자료 — 13 / 14</div>
+</div>
+
+<!-- ════ 페이지 14 : 제한조건 + 팀 역할 + 참고문헌 ════ -->
+<div class="page">
+  <section class="no-break">
+    <h2 class="sec"><span class="n">16</span>현실적 제한조건 반영</h2>
+    <table>
+      <tr><th>제한조건</th><th>반영 내용</th></tr>
+      <tr><td>경제성</td>
+        <td>무료 API(Open-Meteo) 활용으로 구축 비용 절감. Gemini 무료 사용량 제한으로
+        <b>하루 1회 문구 생성·저장 후 재사용</b> → 잘못된 문구나 변동 불일치 가능성 존재.</td></tr>
+      <tr><td>환경성</td>
+        <td>전자종이 + Deep Sleep으로 1회 충전 후 장기 운용 → 배터리 교체·폐기 절감.
+        종이를 매월 교체할 필요가 없어 자원 절감에도 기여.</td></tr>
+      <tr><td>사회성</td>
+        <td>날씨·미세먼지 + AI 생활 조언 항시 제공 → 일상 정보 접근성, 건강 관리(마스크 등)에 도움.
+        별도 앱 조작 없이 표시되어 <b>디지털 취약 계층도 쉽게 이용</b> 가능.</td></tr>
+      <tr><td>윤리성</td><td>해당 내용은 프로젝트와 관계 없음.</td></tr>
+      <tr><td>미학</td>
+        <td>C 보드(선풍기) 배선이 외부로 드러나 외관 정돈 부족. 3D 모델링·치수 측정·출력 등
+        맞춤 케이스 제작은 난이도가 높아 <b>외관 마감보다 기능 구현에 우선순위</b>를 둠.</td></tr>
+      <tr><td>보건/안전</td>
+        <td>전자종이는 발광형이 아니어서 눈 피로·블루라이트 부담이 적음. C 보드는 통신 두절 시
+        <b>모든 출력을 끄는 페일세이프</b>를 적용해 모터·팬 오작동 방지.</td></tr>
+      <tr><td>내구성</td>
+        <td>A 보드는 Deep Sleep으로 부품 부하가 적어 수명이 길고, 통신 실패 시 캐시 폴백과
+        채널 자동 스캔으로 불안정한 환경에서도 안정 동작.</td></tr>
+      <tr><td>관련 표준성</td>
+        <td>ESP-NOW (Espressif 표준 프로토콜), I²C·SPI, <b>WMO 날씨 코드</b>, <b>US AQI 대기질 기준</b>,
+        REST/JSON API 등 널리 쓰이는 표준 규격 준수.</td></tr>
     </table>
   </section>
 
   <section class="no-break">
-    <h2 class="sec"><span class="n">13</span>C 보드 통신 프로토콜</h2>
-    <p>C는 B에 요청을 보내고, B는 최신 센서값과 C 설정을 응답합니다. A·C 메시지는 <b>패킷 크기</b>로 구분되며
-    충돌하지 않도록 C 전용 타입(10·11)을 사용합니다.</p>
+    <h2 class="sec"><span class="n">17</span>팀 역할</h2>
     <table>
-      <tr><th>타입</th><th>값</th><th>방향</th><th>설명</th></tr>
-      <tr><td>MSG_C_REQUEST</td><td>10</td><td>C → B</td><td>센서·설정 요청</td></tr>
-      <tr><td>MSG_C_DATA</td><td>11</td><td>B → C</td><td>온도·조도·PIR + C 설정 응답</td></tr>
+      <tr><th>팀원</th><th>역할</th><th class="center">평가</th></tr>
+      <tr><td>최준서 (팀장, 20210581)</td><td>프로젝트 설계 및 구현 / 발표</td><td class="center">25%</td></tr>
+      <tr><td>김가온 (20220540)</td><td>프로젝트 설계 및 구현 / 결과보고서·발표자료</td><td class="center">25%</td></tr>
+      <tr><td>오성준 (20220490)</td><td>프로젝트 설계 및 구현 / 발표</td><td class="center">25%</td></tr>
+      <tr><td>홍민혁 (20210558)</td><td>프로젝트 설계 및 구현 / 결과보고서·발표자료</td><td class="center">25%</td></tr>
     </table>
-    <pre><code>typedef struct {                 // B → C 응답
-  uint8_t  msgType;     // MSG_C_DATA
-  float    temperature; // B의 DHT11 온도
-  int      lightLevel;  // B의 조도센서 raw
-  uint8_t  motion;      // B의 PIR (1=감지)
-  CConfig  config;      // 모드/출력/버전
-} CMessage;
-
-typedef struct {                 // C 설정
-  uint8_t  cMode;       // 0=Default, 1=Auto
-  uint8_t  cOutput;     // 0=Both, 1=Fan, 2=LED
-  uint16_t cfgVersion;  // 변경 감지용 버전
-} CConfig;</code></pre>
-    <div class="note"><b>채널 자동 탐색:</b> C도 A처럼 <code>savedChannel</code>을 우선 시도하고 실패하면
-    1~13 채널을 스캔해 B를 찾습니다. <b>B 통신이 일정 시간 끊기면</b> 자동 모드에서는 안전을 위해 출력을 모두 끕니다.</div>
   </section>
-  <div class="footer">DualCore Smart Display — 8 / 8</div>
+
+  <section class="no-break">
+    <h2 class="sec"><span class="n">18</span>참고문헌</h2>
+    <ul class="clean" style="font-size:9pt">
+      <li>ESP32 e-Paper Weather Display — github.com/G6EJD/ESP32-e-Paper-Weather-Display</li>
+      <li>ESP32 Weather EPD — github.com/lmarzen/esp32-weather-epd</li>
+      <li>ESP-NOW 공식 문서 — docs.espressif.com / espressif.com/en/solutions/low-power-solutions/esp-now</li>
+      <li>IEEE — Comparative Performance Study of ESP-NOW, Wi-Fi, Bluetooth (Doc. 9573246)</li>
+      <li>Indoor Performance Evaluation of ESP-NOW — researchgate.net/publication/373470899</li>
+      <li>특허: US5961804A (전자종이 원천), US7152040B1 (ESL), US20160259308A1 (스마트홈 자동 제어)</li>
+      <li>Pervasive Displays — How e-paper works / Fast update refresh</li>
+    </ul>
+  </section>
+
+  <div style="text-align:center; margin-top:30px; color:#888; font-size:10pt">
+    — 발표 참고자료 끝 —<br>
+    <span style="font-size:8.5pt">정보통신공학과 3조 · 최준서 · 김가온 · 오성준 · 홍민혁</span>
+  </div>
+
+  <div class="footer">발표 참고자료 — 14 / 14</div>
 </div>
 
 </body>
