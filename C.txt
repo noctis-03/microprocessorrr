@@ -1,0 +1,436 @@
+#include <ESP32Servo.h>
+#include <Adafruit_NeoPixel.h>
+#include <WiFi.h>
+#include <esp_now.h>
+#include <esp_wifi.h>
+
+// ===== 핀 정의 =====
+#define LED_PIN        4
+#define TRIG_PIN       13
+#define ECHO_PIN       14
+#define MOTOR_IA       25
+#define MOTOR_IB       26
+#define JOY_SW         27
+#define SERVO_TILT_PIN 32
+#define SERVO_PAN_PIN  33
+#define JOY_VRX        34
+#define JOY_VRY        35
+
+// ===== 설정값 =====
+#define NUM_LEDS          10
+#define FAN_SPEED         200
+#define JOY_CENTER        2048
+#define JOY_DEADZONE      300
+#define SERVO_STEP        2
+#define MIN_TRIGGER_DIST  10.0
+#define MAX_TRIGGER_DIST  150.0
+#define DIST_MARGIN       5.0
+
+// ===== C 동작 모드 =====
+#define CMODE_DEFAULT  0   // 초음파 거리 기반
+#define CMODE_AUTO     1   // B 센서(온도/조도/PIR) 기반
+
+// ===== 디폴트 모드 출력 선택 =====
+#define OUT_BOTH  0   // LED + 선풍기
+#define OUT_FAN   1   // 선풍기만
+#define OUT_LED   2   // LED만
+
+// ===== 자동 모드 임계값 =====
+#define AUTO_TEMP_ON     28.0   // 이 온도 이상이면 선풍기
+#define AUTO_LIGHT_DARK  1500   // 이 값(0~4095) 이하면 어두움 -> LED
+                                // ※ B의 조도센서 특성에 맞게 조정 필요
+
+// ══════════════════════════════════════
+// ESP-NOW 통신 구조체 (B와 동일해야 함)
+// ══════════════════════════════════════
+#define MSG_C_REQUEST  10   // C -> B : 센서/설정 요청
+#define MSG_C_DATA     11   // B -> C : 센서값 + C설정 응답
+
+// C 보드 설정 (B 웹에서 제어)
+typedef struct {
+  uint8_t  cMode;       // CMODE_DEFAULT / CMODE_AUTO
+  uint8_t  cOutput;     // OUT_BOTH / OUT_FAN / OUT_LED  (디폴트 모드에서만 의미)
+  uint16_t cfgVersion;  // 버전 (변경 감지용)
+} CConfig;
+
+// B -> C 로 보내는 메시지
+typedef struct {
+  uint8_t  msgType;     // MSG_C_DATA
+  float    temperature; // B의 DHT11 온도
+  int      lightLevel;  // B의 조도센서 raw
+  uint8_t  motion;      // B의 PIR (1=감지)
+  CConfig  config;      // C 설정
+} CMessage;
+
+// C -> B 로 보내는 요청
+typedef struct {
+  uint8_t msgType;      // MSG_C_REQUEST
+} CRequest;
+
+// ── B 보드 MAC (A 코드의 peerMAC_B와 동일) ──
+uint8_t peerMAC_B[] = {0x10, 0x51, 0xDB, 0x2B, 0x2D, 0x88};
+
+// ── 채널 스캔 ──
+#define CH_MIN          1
+#define CH_MAX          13
+#define DEFAULT_CHANNEL 10
+
+// ===== 객체 =====
+Servo servoPan;
+Servo servoTilt;
+Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// ===== 상태 변수 =====
+int panAngle  = 90;
+int tiltAngle = 90;
+unsigned long lastDistanceCheck = 0;
+float currentDistance = 999;
+float triggerDistance = 20.0;
+
+// ── B에서 받은 센서값 ──
+volatile bool dataReceived  = false;
+float    bTemperature = 0.0;
+int      bLightLevel  = 4095;   // 기본: 밝음
+bool     bMotion      = false;
+unsigned long lastBData = 0;
+
+// ── C 설정 (B 웹에서 갱신) ──
+CConfig cCfg = { CMODE_DEFAULT, OUT_BOTH, 0 };
+uint16_t lastCfgVersion = 0;
+
+// ── 통신 ──
+int  savedChannel = DEFAULT_CHANNEL;
+#define B_REQUEST_INTERVAL_MS  2000   // B에게 센서/설정 요청 주기
+unsigned long lastBRequest = 0;
+#define DATA_WAIT_TIMEOUT_MS   300
+#define B_DATA_STALE_MS        10000  // 이 시간 넘게 못 받으면 stale
+
+// ══════════════════════════════════════
+// 초음파
+// ══════════════════════════════════════
+float readDistanceCM() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+  if (duration == 0) return 999;
+  return duration * 0.0343 / 2.0;
+}
+
+float readDistanceStable() {
+  float vals[5];
+  for (int i = 0; i < 5; i++) { vals[i] = readDistanceCM(); delay(30); }
+  for (int i = 0; i < 4; i++)
+    for (int j = i + 1; j < 5; j++)
+      if (vals[j] < vals[i]) { float t = vals[i]; vals[i] = vals[j]; vals[j] = t; }
+  return vals[2];
+}
+
+// ══════════════════════════════════════
+// 출력 제어
+// ══════════════════════════════════════
+void ledOn() {
+  for (int i = 0; i < NUM_LEDS; i++)
+    strip.setPixelColor(i, strip.Color(255, 180, 80));
+  strip.show();
+}
+void ledOff() { strip.clear(); strip.show(); }
+
+void fanOn() {
+  digitalWrite(MOTOR_IB, LOW);
+  analogWrite(MOTOR_IA, FAN_SPEED);
+}
+void fanOff() {
+  analogWrite(MOTOR_IA, 0);
+  digitalWrite(MOTOR_IB, LOW);
+}
+
+void scanIndicator(int idx) {
+  strip.clear();
+  strip.setPixelColor(idx % NUM_LEDS, strip.Color(0, 0, 100));
+  strip.show();
+}
+
+// 서보 부드럽게 이동
+void smoothMoveTo(int targetPan, int targetTilt) {
+  targetPan  = constrain(targetPan, 0, 180);
+  targetTilt = constrain(targetTilt, 0, 180);
+  while (panAngle != targetPan || tiltAngle != targetTilt) {
+    if (panAngle  < targetPan)  panAngle++;
+    else if (panAngle  > targetPan)  panAngle--;
+    if (tiltAngle < targetTilt) tiltAngle++;
+    else if (tiltAngle > targetTilt) tiltAngle--;
+    servoPan.write(panAngle);
+    servoTilt.write(tiltAngle);
+    delay(15);
+  }
+}
+
+// ══════════════════════════════════════
+// 초기 스캔: 가장 가까운 거리/방향 찾기
+// ══════════════════════════════════════
+float scanForClosest() {
+  Serial.println("=== Scanning... ===");
+  float minDist  = 999;
+  int   bestPan  = 90;
+  int   bestTilt = 90;
+  int   counter  = 0;
+
+  for (int t = 30; t <= 60; t += 30) {
+    servoTilt.write(t);
+    tiltAngle = t;
+    delay(300);
+    for (int p = 45; p <= 135; p += 20) {
+      servoPan.write(p);
+      panAngle = p;
+      delay(150);
+      scanIndicator(counter++);
+      float d = readDistanceStable();
+      Serial.printf("Pan=%d Tilt=%d -> %.1f cm\n", p, t, d);
+      if (d > 2 && d < minDist) { minDist = d; bestPan = p; bestTilt = t; }
+    }
+  }
+  strip.clear(); strip.show();
+
+  float trig;
+  if (minDist >= 999) {
+    trig = 30.0; bestPan = 90; bestTilt = 90;
+    Serial.println(">> Nothing detected, defaulting to center.");
+  } else {
+    trig = constrain(minDist, MIN_TRIGGER_DIST, MAX_TRIGGER_DIST);
+  }
+  Serial.printf(">> Closest: %.1f cm @ Pan=%d Tilt=%d\n", minDist, bestPan, bestTilt);
+  Serial.printf(">> Trigger distance: %.1f cm\n", trig);
+
+  Serial.println(">> Aiming at closest target...");
+  smoothMoveTo(bestPan, bestTilt);
+
+  for (int k = 0; k < 2; k++) {
+    for (int i = 0; i < NUM_LEDS; i++)
+      strip.setPixelColor(i, strip.Color(0, 120, 0));
+    strip.show(); delay(200);
+    strip.clear(); strip.show(); delay(200);
+  }
+  return trig;
+}
+
+// ══════════════════════════════════════
+// 조이스틱 → 서보 (모드와 무관하게 항상 유지)
+// ══════════════════════════════════════
+void updateServos() {
+  int vx = analogRead(JOY_VRX);
+  int vy = analogRead(JOY_VRY);
+  if (vx > JOY_CENTER + JOY_DEADZONE)      tiltAngle += SERVO_STEP;
+  else if (vx < JOY_CENTER - JOY_DEADZONE) tiltAngle -= SERVO_STEP;
+  if (vy > JOY_CENTER + JOY_DEADZONE)      panAngle += SERVO_STEP;
+  else if (vy < JOY_CENTER - JOY_DEADZONE) panAngle -= SERVO_STEP;
+  panAngle  = constrain(panAngle, 0, 180);
+  tiltAngle = constrain(tiltAngle, 0, 180);
+  servoPan.write(panAngle);
+  servoTilt.write(tiltAngle);
+}
+
+void checkResetButton() {
+  static unsigned long pressedAt = 0;
+  if (digitalRead(JOY_SW) == LOW) {
+    if (pressedAt == 0) pressedAt = millis();
+    if (millis() - pressedAt > 1500) {
+      triggerDistance = scanForClosest();
+      pressedAt = 0;
+    }
+  } else {
+    if (pressedAt > 0 && millis() - pressedAt < 1500) {
+      smoothMoveTo(90, 90);
+    }
+    pressedAt = 0;
+  }
+}
+
+// ══════════════════════════════════════
+// ESP-NOW
+// ══════════════════════════════════════
+void setRadioChannel(int ch) {
+  esp_wifi_set_promiscuous(true);
+  esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+  esp_wifi_set_promiscuous(false);
+}
+
+void onDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int data_len) {
+  if (data_len != sizeof(CMessage)) return;
+  CMessage msg;
+  memcpy(&msg, data, sizeof(CMessage));
+  if (msg.msgType != MSG_C_DATA) return;
+
+  bTemperature = msg.temperature;
+  bLightLevel  = msg.lightLevel;
+  bMotion      = msg.motion ? true : false;
+
+  // 설정은 버전이 더 높을 때만 갱신 (첫 수신 포함)
+  if (msg.config.cfgVersion > lastCfgVersion || lastCfgVersion == 0) {
+    cCfg = msg.config;
+    lastCfgVersion = msg.config.cfgVersion;
+    Serial.printf("[CFG] mode=%d output=%d ver=%d\n",
+                  cCfg.cMode, cCfg.cOutput, lastCfgVersion);
+  }
+
+  dataReceived = true;
+  lastBData = millis();
+}
+
+void onDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
+  // 필요 시 디버그
+}
+
+void initESPNow() {
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+  Serial.print("C MAC: "); Serial.println(WiFi.macAddress());
+  setRadioChannel(savedChannel);
+  if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW init FAIL"); return; }
+  esp_now_register_recv_cb(onDataRecv);
+  esp_now_register_send_cb(onDataSent);
+  esp_now_peer_info_t peer = {};
+  memcpy(peer.peer_addr, peerMAC_B, 6);
+  peer.channel = 0;
+  peer.encrypt = false;
+  esp_now_add_peer(&peer);
+  Serial.printf("ESP-NOW ready (C) CH:%d\n", savedChannel);
+}
+
+// 특정 채널에서 한 번 요청 후 응답 대기
+bool tryRequestOnChannel(int ch) {
+  setRadioChannel(ch);
+  CRequest req;
+  req.msgType = MSG_C_REQUEST;
+  dataReceived = false;
+  esp_now_send(peerMAC_B, (uint8_t*)&req, sizeof(CRequest));
+  unsigned long start = millis();
+  while (!dataReceived && (millis() - start < DATA_WAIT_TIMEOUT_MS)) delay(5);
+  return dataReceived;
+}
+
+// B에게 센서/설정 요청 (채널 자동 탐색 포함)
+void requestFromB() {
+  // 1) 마지막 성공 채널
+  if (tryRequestOnChannel(savedChannel)) return;
+  // 2) 전체 스캔
+  for (int ch = CH_MIN; ch <= CH_MAX; ch++) {
+    if (ch == savedChannel) continue;
+    if (tryRequestOnChannel(ch)) {
+      savedChannel = ch;
+      Serial.printf("Found B on CH:%d\n", ch);
+      return;
+    }
+  }
+  setRadioChannel(savedChannel);
+}
+
+// ══════════════════════════════════════
+// 모드별 출력 제어
+// ══════════════════════════════════════
+// 디폴트 모드: 초음파 거리 기반
+void runDefaultMode() {
+  if (millis() - lastDistanceCheck > 100) {
+    lastDistanceCheck = millis();
+    currentDistance = readDistanceCM();
+    float threshold = triggerDistance + DIST_MARGIN;
+
+    bool inRange = (currentDistance > 2 && currentDistance <= threshold);
+
+    Serial.printf("[DEF] D=%.1f Thr=%.1f out=%d in=%d\n",
+                  currentDistance, threshold, cCfg.cOutput, inRange);
+
+    if (inRange) {
+      // 출력 선택에 따라 켬
+      if (cCfg.cOutput == OUT_BOTH)      { ledOn();  fanOn();  }
+      else if (cCfg.cOutput == OUT_FAN)  { ledOff(); fanOn();  }
+      else /* OUT_LED */                 { ledOn();  fanOff(); }
+    } else {
+      ledOff(); fanOff();
+    }
+  }
+}
+
+// 자동 모드: B의 온도/조도/PIR 기반 (초음파 무시)
+void runAutoMode() {
+  static unsigned long lastLog = 0;
+
+  // B 데이터가 너무 오래되면(통신 끊김) 안전하게 OFF
+  bool stale = (millis() - lastBData > B_DATA_STALE_MS);
+
+  bool fanWant = false;
+  bool ledWant = false;
+
+  if (!stale) {
+    bool dark   = (bLightLevel <= AUTO_LIGHT_DARK);
+    bool hot    = (bTemperature >= AUTO_TEMP_ON);
+    bool person = bMotion;
+
+    // 사람이 감지될 때만 동작
+    if (person) {
+      if (hot)  fanWant = true;
+      if (dark) ledWant = true;
+    }
+  }
+
+  if (fanWant) fanOn(); else fanOff();
+  if (ledWant) ledOn(); else ledOff();
+
+  if (millis() - lastLog > 1000) {
+    lastLog = millis();
+    Serial.printf("[AUTO] T=%.1f L=%d PIR=%d stale=%d -> fan=%d led=%d\n",
+                  bTemperature, bLightLevel, bMotion, stale, fanWant, ledWant);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(MOTOR_IA, OUTPUT);
+  pinMode(MOTOR_IB, OUTPUT);
+  pinMode(JOY_SW, INPUT_PULLUP);
+
+  analogReadResolution(12);
+  analogSetAttenuation(ADC_11db);
+
+  servoPan.attach(SERVO_PAN_PIN, 500, 2400);
+  servoTilt.attach(SERVO_TILT_PIN, 500, 2400);
+  servoPan.write(90);  servoTilt.write(90);
+  panAngle = 90; tiltAngle = 90;
+
+  strip.begin();
+  strip.setBrightness(150);
+  strip.clear(); strip.show();
+
+  fanOff();
+
+  initESPNow();          // ESP-NOW 먼저 (시리얼에 C MAC 출력됨)
+
+  delay(800);
+  triggerDistance = scanForClosest();
+
+  Serial.println("System ready.");
+}
+
+void loop() {
+  // 조이스틱 서보는 모드와 무관하게 항상 동작
+  updateServos();
+  checkResetButton();
+
+  // 주기적으로 B에게 센서/설정 요청
+  if (millis() - lastBRequest > B_REQUEST_INTERVAL_MS) {
+    lastBRequest = millis();
+    requestFromB();
+  }
+
+  // 모드에 따라 출력 제어
+  if (cCfg.cMode == CMODE_AUTO) runAutoMode();
+  else                          runDefaultMode();
+
+  delay(20);
+}

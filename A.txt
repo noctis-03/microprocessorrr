@@ -1,0 +1,1002 @@
+#include <WiFi.h>
+#include <esp_now.h>
+#include <esp_wifi.h>
+#include <esp_sleep.h>
+#include "GxEPD2_BW.h"
+#include <Fonts/FreeMonoBold24pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
+#include <Fonts/FreeSansBold12pt7b.h>
+#include <Fonts/FreeSansBold9pt7b.h>
+#include <Fonts/FreeSans9pt7b.h>
+#include <Fonts/FreeMono9pt7b.h>
+
+// ── 핀 정의 ──
+#define EPD_PWR  7
+#define EPD_BUSY 48
+#define EPD_RST  47
+#define EPD_DC   46
+#define EPD_CS   45
+
+#define BTN_MENU 2
+#define BTN_EXIT 1
+#define BTN_UP   6
+#define BTN_DOWN 4
+#define BTN_OK   5
+
+// ── 디스플레이 ──
+GxEPD2_BW<GxEPD2_420_GYE042A87, GxEPD2_420_GYE042A87::HEIGHT>
+  display(GxEPD2_420_GYE042A87(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
+
+#define SCREEN_W 400
+#define SCREEN_H 300
+
+#define WEATHER_SLOTS 6
+
+// ── AI 멘트 chunk 설정 ──
+#define AI_CHUNK_SIZE   200
+#define AI_MAX_CHUNKS   4
+#define AI_BUF_SIZE     (AI_CHUNK_SIZE * AI_MAX_CHUNKS)
+
+// ── 채널 스캔 범위 ──
+#define CH_MIN          1
+#define CH_MAX          13
+#define DEFAULT_CHANNEL 10   // 스캔 실패 시 폴백 채널
+
+// ── 설정 기본값 (DEFAULT) ──
+#define DEF_WAKE_HOUR          7
+#define DEF_SLEEP_TIMEOUT_SEC  10
+#define DEF_FULL_REFRESH       15
+#define DEF_AI_ENABLED         1
+#define DEF_LAT                36.3504f
+#define DEF_LON                127.3845f
+
+// ── 설정 구조체 (B와 동일해야 함) ──
+typedef struct {
+  uint8_t  wakeHour;
+  uint16_t sleepTimeoutSec;
+  uint8_t  fullRefreshEvery;
+  uint8_t  aiEnabled;
+  float    lat;
+  float    lon;
+  uint16_t configVersion;
+} BoardConfig;
+
+// ── 통신 구조체 (B와 동일해야 함) ──
+typedef struct {
+  uint8_t msgType;
+  float   temperature;
+  float   humidity;
+  int     year;
+  int     month;
+  int     day;
+  int     weekday;
+  int     hour;
+  int     minute;
+  int8_t  fcHour[WEATHER_SLOTS];
+  int8_t  fcTemp[WEATHER_SLOTS];
+  uint8_t fcHumid[WEATHER_SLOTS];
+  uint8_t fcCode[WEATHER_SLOTS];
+  int8_t  todayMax;
+  int8_t  todayMin;
+  uint8_t todayPop;
+  uint8_t pm25;
+  uint8_t usAqi;
+  BoardConfig config;   // ★ 설정값 수신
+} Message;
+
+typedef struct {
+  uint8_t  msgType;
+  uint8_t  totalChunks;
+  uint8_t  chunkIndex;
+  uint8_t  dataLen;
+  uint8_t  commentDay;
+  char     data[AI_CHUNK_SIZE];
+} AIChunk;
+
+#define MSG_REQUEST     0
+#define MSG_SENSOR_DATA 1
+#define MSG_AI_REQUEST  2
+#define MSG_AI_CHUNK    3
+
+uint8_t peerMAC_B[] = {0x10, 0x51, 0xDB, 0x2B, 0x2D, 0x88};
+
+#define SCAN_ATTEMPTS  3
+
+#define MODE_CALENDAR  0
+#define MODE_SENSOR    1
+#define MODE_AIRENV    2
+#define DIAL_MODE_COUNT 3
+#define MODE_INFO      99
+
+// ── RTC 변수 ──
+RTC_DATA_ATTR int year = 2026;
+RTC_DATA_ATTR int month = 6;
+RTC_DATA_ATTR int day = 4;
+RTC_DATA_ATTR int weekday = 3;
+RTC_DATA_ATTR int hour = 0;
+RTC_DATA_ATTR int minute = 0;
+RTC_DATA_ATTR int currentMode = MODE_CALENDAR;
+RTC_DATA_ATTR int calendarView = 0;
+RTC_DATA_ATTR int bootCount = 0;
+RTC_DATA_ATTR int partialRefreshCount = 0;
+RTC_DATA_ATTR float lastTemp = 0.0;
+RTC_DATA_ATTR float lastHumidity = 0.0;
+RTC_DATA_ATTR bool  timeEverSynced = false;
+RTC_DATA_ATTR int   savedChannel = DEFAULT_CHANNEL;  // 마지막으로 통신 성공한 채널
+
+RTC_DATA_ATTR int8_t  fcHour[WEATHER_SLOTS];
+RTC_DATA_ATTR int8_t  fcTemp[WEATHER_SLOTS];
+RTC_DATA_ATTR uint8_t fcHumid[WEATHER_SLOTS];
+RTC_DATA_ATTR uint8_t fcCode[WEATHER_SLOTS];
+RTC_DATA_ATTR bool    fcValid = false;
+
+RTC_DATA_ATTR int8_t  todayMax = 0;
+RTC_DATA_ATTR int8_t  todayMin = 0;
+RTC_DATA_ATTR uint8_t todayPop = 0;
+RTC_DATA_ATTR uint8_t pm25 = 0;
+RTC_DATA_ATTR uint8_t usAqi = 0;
+RTC_DATA_ATTR bool    envValid = false;
+
+RTC_DATA_ATTR char aiComment[AI_BUF_SIZE] = "";
+RTC_DATA_ATTR int  aiCommentDay = -1;
+RTC_DATA_ATTR bool aiCommentValid = false;
+
+// ── 마지막으로 B와 통신 성공한 시각(날짜/시각) ──
+RTC_DATA_ATTR int  lastSyncYear  = 0;
+RTC_DATA_ATTR int  lastSyncMonth = 0;
+RTC_DATA_ATTR int  lastSyncDay   = 0;
+RTC_DATA_ATTR int  lastSyncHour  = 0;
+RTC_DATA_ATTR int  lastSyncMin   = 0;
+RTC_DATA_ATTR bool everGotData   = false;   // 한 번이라도 B에서 받은 적 있는지
+
+// ── 적용된 설정 (deep sleep 유지) ──
+RTC_DATA_ATTR BoardConfig appliedCfg = {
+  DEF_WAKE_HOUR, DEF_SLEEP_TIMEOUT_SEC, DEF_FULL_REFRESH,
+  DEF_AI_ENABLED, DEF_LAT, DEF_LON, 0
+};
+RTC_DATA_ATTR uint16_t lastCfgVersion = 0;
+
+// ── 이번 깨어남에서 새 데이터를 받았는지 (RTC 불필요, 매 부팅 초기화) ──
+bool gotFreshData = false;
+bool gotFreshAI   = false;
+
+#define REFRESH_INTERVAL_SEC  (24ULL * 3600)
+#define DEBOUNCE_MS           200
+#define DATA_WAIT_TIMEOUT_MS  400
+#define AI_WAIT_TIMEOUT_MS    1000
+
+#define INDICATOR_X      10
+#define INDICATOR_Y      10
+#define INDICATOR_R      4
+#define INDICATOR_AREA_W 24
+#define INDICATOR_AREA_H 24
+
+const char* monthNames[] = {
+  "", "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+};
+const char* dayNames[] = {
+  "Sunday", "Monday", "Tuesday", "Wednesday",
+  "Thursday", "Friday", "Saturday"
+};
+const char* dayNamesShort[] = {
+  "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+};
+
+// ── 아이콘 (24x24) ──
+#define ICON_W 24
+#define ICON_H 24
+
+const unsigned char icon_sun[] PROGMEM = {
+  0x00,0x18,0x00, 0x00,0x18,0x00, 0x00,0x18,0x00, 0x20,0x18,0x04,
+  0x10,0x00,0x08, 0x00,0x3C,0x00, 0x00,0x7E,0x00, 0x00,0xFF,0x00,
+  0x01,0xFF,0x80, 0x01,0xFF,0x80, 0xFF,0xFF,0xFF, 0xFF,0xFF,0xFF,
+  0x01,0xFF,0x80, 0x01,0xFF,0x80, 0x00,0xFF,0x00, 0x00,0x7E,0x00,
+  0x00,0x3C,0x00, 0x10,0x00,0x08, 0x20,0x18,0x04, 0x00,0x18,0x00,
+  0x00,0x18,0x00, 0x00,0x18,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00
+};
+const unsigned char icon_cloud[] PROGMEM = {
+  0x00,0x00,0x00, 0x00,0x00,0x00, 0x00,0x7C,0x00, 0x00,0xFE,0x00,
+  0x01,0xFF,0x00, 0x03,0xFF,0x80, 0x03,0xFF,0x80, 0x07,0xFF,0xC0,
+  0x1F,0xFF,0xE0, 0x3F,0xFF,0xF0, 0x7F,0xFF,0xF8, 0xFF,0xFF,0xFC,
+  0xFF,0xFF,0xFE, 0xFF,0xFF,0xFE, 0x7F,0xFF,0xFC, 0x3F,0xFF,0xF8,
+  0x00,0x00,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00,
+  0x00,0x00,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00
+};
+const unsigned char icon_rain[] PROGMEM = {
+  0x00,0x7C,0x00, 0x00,0xFE,0x00, 0x01,0xFF,0x00, 0x03,0xFF,0x80,
+  0x07,0xFF,0xC0, 0x1F,0xFF,0xE0, 0x3F,0xFF,0xF0, 0x7F,0xFF,0xF8,
+  0xFF,0xFF,0xFC, 0xFF,0xFF,0xFE, 0x7F,0xFF,0xFC, 0x3F,0xFF,0xF8,
+  0x00,0x00,0x00, 0x11,0x11,0x00, 0x22,0x22,0x00, 0x11,0x11,0x00,
+  0x22,0x22,0x00, 0x11,0x11,0x00, 0x22,0x22,0x00, 0x11,0x11,0x00,
+  0x00,0x00,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00
+};
+const unsigned char icon_snow[] PROGMEM = {
+  0x00,0x7C,0x00, 0x00,0xFE,0x00, 0x01,0xFF,0x00, 0x03,0xFF,0x80,
+  0x07,0xFF,0xC0, 0x1F,0xFF,0xE0, 0x3F,0xFF,0xF0, 0x7F,0xFF,0xF8,
+  0xFF,0xFF,0xFC, 0xFF,0xFF,0xFE, 0x7F,0xFF,0xFC, 0x3F,0xFF,0xF8,
+  0x00,0x00,0x00, 0x24,0x90,0x00, 0x18,0x60,0x00, 0x7E,0xF8,0x00,
+  0x18,0x60,0x00, 0x24,0x90,0x00, 0x00,0x00,0x00, 0x09,0x24,0x00,
+  0x06,0x18,0x00, 0x1F,0xBE,0x00, 0x06,0x18,0x00, 0x09,0x24,0x00
+};
+const unsigned char icon_fog[] PROGMEM = {
+  0x00,0x00,0x00, 0x00,0x00,0x00, 0x7F,0xFF,0xFE, 0x00,0x00,0x00,
+  0x00,0x00,0x00, 0x3F,0xFF,0xFC, 0x00,0x00,0x00, 0x00,0x00,0x00,
+  0x7F,0xFF,0xFE, 0x00,0x00,0x00, 0x00,0x00,0x00, 0x3F,0xFF,0xFC,
+  0x00,0x00,0x00, 0x00,0x00,0x00, 0x7F,0xFF,0xFE, 0x00,0x00,0x00,
+  0x00,0x00,0x00, 0x3F,0xFF,0xFC, 0x00,0x00,0x00, 0x00,0x00,0x00,
+  0x7F,0xFF,0xFE, 0x00,0x00,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00
+};
+const unsigned char icon_storm[] PROGMEM = {
+  0x00,0x7C,0x00, 0x00,0xFE,0x00, 0x01,0xFF,0x00, 0x03,0xFF,0x80,
+  0x07,0xFF,0xC0, 0x1F,0xFF,0xE0, 0x3F,0xFF,0xF0, 0x7F,0xFF,0xF8,
+  0xFF,0xFF,0xFC, 0xFF,0xFF,0xFE, 0x7F,0xFF,0xFC, 0x3F,0xFF,0xF8,
+  0x00,0x00,0x00, 0x00,0x70,0x00, 0x00,0xE0,0x00, 0x01,0xC0,0x00,
+  0x03,0xF8,0x00, 0x00,0x70,0x00, 0x00,0xE0,0x00, 0x01,0xC0,0x00,
+  0x03,0x80,0x00, 0x07,0x00,0x00, 0x00,0x00,0x00, 0x00,0x00,0x00
+};
+
+// ── 수신 ──
+volatile bool dataReceived = false;
+Message rxMsg;
+
+char     aiRecvBuf[AI_BUF_SIZE];
+bool     aiChunkGot[AI_MAX_CHUNKS];
+uint8_t  aiTotalChunks = 0;
+uint8_t  aiRecvDay = 0;
+volatile bool aiChunkReceived = false;
+volatile bool aiAllReceived = false;
+
+unsigned long lastActivity = 0;
+void resetActivityTimer() { lastActivity = millis(); }
+bool isTimeoutReached() {
+  return (millis() - lastActivity) >= (unsigned long)appliedCfg.sleepTimeoutSec * 1000UL;
+}
+
+#define EXIT_TIMEOUT     0
+#define EXIT_MODE_CHANGE 1
+int exitReason = EXIT_TIMEOUT;
+
+// ══════════════════════════════════════
+// ESP‑NOW 콜백
+// ══════════════════════════════════════
+void onDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int data_len) {
+  if (data_len == sizeof(Message)) {
+    memcpy((void*)&rxMsg, data, sizeof(Message));
+    if (rxMsg.msgType == MSG_SENSOR_DATA) {
+      lastTemp = rxMsg.temperature;
+      lastHumidity = rxMsg.humidity;
+      if (rxMsg.year >= 2025) {
+        year = rxMsg.year; month = rxMsg.month; day = rxMsg.day;
+        weekday = rxMsg.weekday; hour = rxMsg.hour; minute = rxMsg.minute;
+        timeEverSynced = true;
+        // 마지막 동기화 시각 기록
+        lastSyncYear = year; lastSyncMonth = month; lastSyncDay = day;
+        lastSyncHour = hour; lastSyncMin = minute;
+      }
+      if (rxMsg.fcHour[0] >= 0) {
+        memcpy(fcHour,  rxMsg.fcHour,  sizeof(fcHour));
+        memcpy(fcTemp,  rxMsg.fcTemp,  sizeof(fcTemp));
+        memcpy(fcHumid, rxMsg.fcHumid, sizeof(fcHumid));
+        memcpy(fcCode,  rxMsg.fcCode,  sizeof(fcCode));
+        fcValid = true;
+      }
+      todayMax = rxMsg.todayMax;
+      todayMin = rxMsg.todayMin;
+      todayPop = rxMsg.todayPop;
+      pm25     = rxMsg.pm25;
+      usAqi    = rxMsg.usAqi;
+      if (usAqi > 0 || pm25 > 0) envValid = true;
+
+      // ★ 설정값 수신: 버전이 더 높을 때만 갱신
+      if (rxMsg.config.configVersion > lastCfgVersion) {
+        appliedCfg = rxMsg.config;
+        lastCfgVersion = rxMsg.config.configVersion;
+        Serial.printf("[CFG] updated from B (ver %d)\n", lastCfgVersion);
+      }
+
+      dataReceived = true;
+      everGotData = true;
+    }
+    return;
+  }
+
+  if (data_len == sizeof(AIChunk)) {
+    AIChunk ck;
+    memcpy(&ck, data, sizeof(AIChunk));
+    if (ck.msgType != MSG_AI_CHUNK) return;
+    if (ck.totalChunks == 0 || ck.totalChunks > AI_MAX_CHUNKS) return;
+    if (ck.chunkIndex >= ck.totalChunks) return;
+
+    aiTotalChunks = ck.totalChunks;
+    aiRecvDay = ck.commentDay;
+
+    uint8_t len = ck.dataLen;
+    if (len > AI_CHUNK_SIZE) len = AI_CHUNK_SIZE;
+    int off = ck.chunkIndex * AI_CHUNK_SIZE;
+    if (off + len <= AI_BUF_SIZE) {
+      memcpy(aiRecvBuf + off, ck.data, len);
+      aiChunkGot[ck.chunkIndex] = true;
+    }
+
+    bool all = true;
+    for (int i = 0; i < aiTotalChunks; i++) if (!aiChunkGot[i]) { all = false; break; }
+    if (all) {
+      int total = (aiTotalChunks - 1) * AI_CHUNK_SIZE + len;
+      if (total >= AI_BUF_SIZE) total = AI_BUF_SIZE - 1;
+      aiRecvBuf[total] = '\0';
+      aiAllReceived = true;
+    }
+    aiChunkReceived = true;
+    return;
+  }
+}
+
+void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.printf("[SEND] %s\n", status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
+}
+
+// ══════════════════════════════════════
+// EPD 유틸
+// ══════════════════════════════════════
+void epdPowerOn() { pinMode(EPD_PWR, OUTPUT); digitalWrite(EPD_PWR, HIGH); delay(50); }
+void epdPowerOff() { digitalWrite(EPD_PWR, LOW); }
+
+void drawCentered(const GFXfont* font, const char* text, int y) {
+  display.setFont(font);
+  int16_t x1, y1; uint16_t w, h;
+  display.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor((SCREEN_W - w) / 2 - x1, y);
+  display.print(text);
+}
+void drawCenteredIn(const GFXfont* font, const char* text, int areaX, int areaW, int y) {
+  display.setFont(font);
+  int16_t x1, y1; uint16_t w, h;
+  display.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
+  display.setCursor(areaX + (areaW - (int)w) / 2 - x1, y);
+  display.print(text);
+}
+
+// ── 24x24 1bpp 비트맵을 scale배 확대해서 그리기 ──
+void drawBitmap2x(int x, int y, const unsigned char* bmp, int scale) {
+  for (int row = 0; row < ICON_H; row++) {
+    for (int col = 0; col < ICON_W; col++) {
+      int byteIndex = row * ((ICON_W + 7) / 8) + (col / 8);
+      uint8_t b = pgm_read_byte(&bmp[byteIndex]);
+      bool on = b & (0x80 >> (col % 8));
+      if (on) {
+        display.fillRect(x + col * scale, y + row * scale, scale, scale, GxEPD_BLACK);
+      }
+    }
+  }
+}
+
+int daysInMonth(int y, int m) {
+  int days[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+  if (m == 2 && ((y%4==0 && y%100!=0) || y%400==0)) return 29;
+  return days[m];
+}
+int firstDayOfMonth(int y, int m) {
+  int diff = day - 1;
+  return (weekday - (diff % 7) + 7) % 7;
+}
+
+bool isButtonPressed(int pin) {
+  if (digitalRead(pin) == LOW) { delay(DEBOUNCE_MS); if (digitalRead(pin) == LOW) return true; }
+  return false;
+}
+void waitButtonRelease(int pin) { while (digitalRead(pin) == LOW) delay(50); }
+
+// ── 캐시 상태 판단: 이번에 새 데이터를 못 받았고, 보여줄 캐시는 있을 때 ──
+bool isShowingCached() {
+  return (!gotFreshData) && everGotData;
+}
+
+// ── 화면 우상단에 "CACHED" 배지 표시 ──
+void drawCachedBadge() {
+  if (!isShowingCached()) return;
+  display.setFont(&FreeSans9pt7b);
+  const char* tag = "CACHED";
+  int16_t bx, by; uint16_t bw, bh;
+  display.getTextBounds(tag, 0, 0, &bx, &by, &bw, &bh);
+  int padX = 6, padY = 3;
+  int boxW = bw + padX * 2;
+  int boxH = bh + padY * 2;
+  int x = SCREEN_W - boxW - 6;
+  int y = 4;
+  display.fillRoundRect(x, y, boxW, boxH, 3, GxEPD_BLACK);
+  display.setTextColor(GxEPD_WHITE);
+  display.setCursor(x + padX - bx, y + padY - by);
+  display.print(tag);
+  display.setTextColor(GxEPD_BLACK);
+}
+
+// ══════════════════════════════════════
+// 슬립 인디케이터
+// ══════════════════════════════════════
+void showSleepIndicator() {
+  epdPowerOn();
+  display.init(115200, false, 50, false);
+  display.setRotation(0);
+  display.setPartialWindow(0, 0, INDICATOR_AREA_W, INDICATOR_AREA_H);
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+    display.fillCircle(INDICATOR_X, INDICATOR_Y, INDICATOR_R, GxEPD_BLACK);
+  } while (display.nextPage());
+  display.hibernate();
+  epdPowerOff();
+}
+
+// ══════════════════════════════════════
+// ESP‑NOW 초기화 (특정 채널로)
+// ══════════════════════════════════════
+void setRadioChannel(int ch) {
+  esp_wifi_set_promiscuous(true);
+  esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+  esp_wifi_set_promiscuous(false);
+}
+
+void initESPNow() {
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+  setRadioChannel(savedChannel);
+  if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW FAIL"); return; }
+  esp_now_register_recv_cb(onDataRecv);
+  esp_now_register_send_cb(esp_now_send_cb_t(onDataSent));
+  esp_now_peer_info_t peerInfo = {};
+  memcpy(peerInfo.peer_addr, peerMAC_B, 6);
+  peerInfo.channel = 0;       // 0 = 현재 라디오 채널 사용
+  peerInfo.encrypt = false;
+  esp_now_add_peer(&peerInfo);
+  Serial.printf("ESP-NOW ready CH:%d\n", savedChannel);
+}
+
+// ── 특정 채널에서 한 번 요청 후 응답 대기 ──
+bool tryRequestOnChannel(int ch) {
+  setRadioChannel(ch);
+  Message req = {};
+  req.msgType = MSG_REQUEST;
+  dataReceived = false;
+  esp_now_send(peerMAC_B, (uint8_t *)&req, sizeof(Message));
+  unsigned long start = millis();
+  while (!dataReceived && (millis() - start < DATA_WAIT_TIMEOUT_MS)) delay(10);
+  return dataReceived;
+}
+
+// ══════════════════════════════════════
+// 센서 데이터 요청
+//   1) 마지막 성공 채널(savedChannel)에서 SCAN_ATTEMPTS회 시도
+//   2) 실패하면 1~13 전체 채널 스캔
+//   3) 성공한 채널을 savedChannel 에 저장
+//   gotFreshData: 이번에 새 데이터를 받았는지 표시
+// ══════════════════════════════════════
+void requestSensorData() {
+  gotFreshData = false;
+
+  // 1) 우선 마지막 성공 채널에서 시도
+  for (int attempt = 0; attempt < SCAN_ATTEMPTS; attempt++) {
+    if (tryRequestOnChannel(savedChannel)) {
+      gotFreshData = true;
+      Serial.printf("OK on saved CH:%d (try %d) T:%.1f H:%.1f%%\n",
+                    savedChannel, attempt + 1, lastTemp, lastHumidity);
+      return;
+    }
+  }
+
+  // 2) 전체 채널 스캔
+  Serial.println("Saved channel failed -> scanning 1..13");
+  for (int ch = CH_MIN; ch <= CH_MAX; ch++) {
+    if (ch == savedChannel) continue;   // 이미 위에서 시도함
+    if (tryRequestOnChannel(ch)) {
+      savedChannel = ch;                // ★ 성공한 채널 기억
+      gotFreshData = true;
+      Serial.printf("Found B on CH:%d  T:%.1f H:%.1f%%\n",
+                    ch, lastTemp, lastHumidity);
+      return;
+    }
+  }
+
+  // 3) 실패: 라디오를 savedChannel 로 복구하고 캐시 데이터 사용
+  setRadioChannel(savedChannel);
+  Serial.println("No response on any channel -> use cached data");
+}
+
+void requestAIComment() {
+  gotFreshAI = false;
+  if (aiCommentValid && aiCommentDay == day) return;   // 오늘 멘트 이미 보유
+  AIChunk req = {};
+  req.msgType = MSG_AI_REQUEST;
+  setRadioChannel(savedChannel);
+  for (int attempt = 0; attempt < SCAN_ATTEMPTS; attempt++) {
+    for (int i = 0; i < AI_MAX_CHUNKS; i++) aiChunkGot[i] = false;
+    aiAllReceived = false; aiChunkReceived = false; aiTotalChunks = 0;
+    esp_now_send(peerMAC_B, (uint8_t *)&req, sizeof(AIChunk));
+    unsigned long start = millis();
+    while (!aiAllReceived && (millis() - start < AI_WAIT_TIMEOUT_MS)) delay(10);
+    if (aiAllReceived) {
+      strncpy(aiComment, aiRecvBuf, AI_BUF_SIZE - 1);
+      aiComment[AI_BUF_SIZE - 1] = '\0';
+      aiCommentDay = aiRecvDay;
+      aiCommentValid = true;
+      gotFreshAI = true;
+      Serial.printf("[AI] comment received (day %d): %s\n", aiRecvDay, aiComment);
+      return;
+    }
+  }
+  Serial.println("[AI] no comment yet");
+}
+
+const unsigned char* weatherIcon(uint8_t code) {
+  if (code == 0) return icon_sun;
+  if (code <= 3) return icon_cloud;
+  if (code <= 48) return icon_fog;
+  if (code <= 67) return icon_rain;
+  if (code <= 77) return icon_snow;
+  if (code <= 82) return icon_rain;
+  return icon_storm;
+}
+
+const char* aqiGrade(uint8_t aqi) {
+  if (aqi == 0)   return "N/A";
+  if (aqi <= 50)  return "Good";
+  if (aqi <= 100) return "Moderate";
+  if (aqi <= 150) return "Sensitive";
+  if (aqi <= 200) return "Unhealthy";
+  if (aqi <= 300) return "Very Bad";
+  return "Hazardous";
+}
+
+// ── 현재 시각에 가장 가까운 예보 슬롯 인덱스 ──
+int pickSlotByNow() {
+  if (!fcValid) return 3;
+  int best = 0, bestDiff = 99;
+  for (int i = 0; i < WEATHER_SLOTS; i++) {
+    if (fcHour[i] < 0) continue;
+    int diff = abs((int)fcHour[i] - hour);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  }
+  return best;
+}
+
+// ── 워드랩 (영어) ──
+void drawWrappedText(const GFXfont* font, const char* text,
+                     int x, int y, int maxWidth, int lineH, int maxLines) {
+  display.setFont(font);
+  display.setTextColor(GxEPD_BLACK);
+  char line[128] = "";
+  char word[64];
+  int wi = 0, lineCount = 0;
+  const char* p = text;
+
+  auto flushWord = [&](bool endOfText) {
+    word[wi] = '\0';
+    if (wi == 0 && !endOfText) return;
+    char trial[160];
+    if (line[0] == '\0') snprintf(trial, sizeof(trial), "%s", word);
+    else                 snprintf(trial, sizeof(trial), "%s %s", line, word);
+    int16_t bx, by; uint16_t bw, bh;
+    display.getTextBounds(trial, 0, 0, &bx, &by, &bw, &bh);
+    if ((int)bw > maxWidth && line[0] != '\0') {
+      display.setCursor(x, y + lineCount * lineH);
+      display.print(line);
+      lineCount++;
+      strncpy(line, word, sizeof(line) - 1); line[sizeof(line)-1] = '\0';
+    } else {
+      strncpy(line, trial, sizeof(line) - 1); line[sizeof(line)-1] = '\0';
+    }
+    wi = 0;
+  };
+
+  while (*p && lineCount < maxLines) {
+    if (*p == ' ' || *p == '\n') {
+      flushWord(false);
+      if (*p == '\n') {
+        display.setCursor(x, y + lineCount * lineH);
+        display.print(line); lineCount++; line[0] = '\0';
+      }
+    } else {
+      if (wi < (int)sizeof(word) - 1) word[wi++] = *p;
+    }
+    p++;
+  }
+  if (lineCount < maxLines) {
+    flushWord(true);
+    if (line[0] != '\0') {
+      display.setCursor(x, y + lineCount * lineH);
+      display.print(line);
+    }
+  }
+}
+
+// ══════════════════════════════════════
+// 하단 바 (캘린더 온습도 — 실내 센서)
+// ══════════════════════════════════════
+void drawBottomBar() {
+  display.setFont(&FreeSans9pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  display.setCursor(20, 285);
+  if (timeEverSynced || lastTemp > 0) {
+    display.printf("%.1f", lastTemp);
+    int16_t cx = display.getCursorX();
+    display.drawCircle(cx + 3, 275, 2, GxEPD_BLACK);
+    display.setCursor(cx + 8, 285); display.print("C");
+  } else {
+    display.print("--"); display.drawCircle(43, 275, 2, GxEPD_BLACK);
+    display.setCursor(48, 285); display.print("C");
+  }
+  display.setCursor(330, 285);
+  if (timeEverSynced || lastHumidity > 0) display.printf("%.0f%%", lastHumidity);
+  else display.print("--%");
+}
+
+void drawDayView() {
+  display.fillScreen(GxEPD_WHITE);
+  display.setTextColor(GxEPD_BLACK);
+  char buf[8]; sprintf(buf, "%d", year);
+  drawCentered(&FreeSansBold12pt7b, buf, 50);
+  drawCentered(&FreeMonoBold18pt7b, monthNames[month], 110);
+  sprintf(buf, "%d", day);
+  drawCentered(&FreeMonoBold24pt7b, buf, 180);
+  drawCentered(&FreeSansBold12pt7b, dayNames[weekday], 230);
+  display.drawLine(20, 255, 380, 255, GxEPD_BLACK);
+  drawBottomBar();
+  drawCachedBadge();
+}
+
+void drawMonthView() {
+  display.fillScreen(GxEPD_WHITE);
+  display.setTextColor(GxEPD_BLACK);
+  char header[32]; sprintf(header, "%s %d", monthNames[month], year);
+  drawCentered(&FreeSansBold12pt7b, header, 28);
+  display.drawLine(10, 36, 390, 36, GxEPD_BLACK);
+  display.setFont(&FreeSans9pt7b);
+  int colWidth = 54, startX = 15;
+  for (int i = 0; i < 7; i++) { display.setCursor(startX + i * colWidth, 55); display.print(dayNamesShort[i]); }
+  display.drawLine(10, 62, 390, 62, GxEPD_BLACK);
+  int firstDay = firstDayOfMonth(year, month);
+  int totalDays = daysInMonth(year, month);
+  int rowY = 85, rowHeight = 28, col = firstDay;
+  display.setFont(&FreeMono9pt7b);
+  for (int d = 1; d <= totalDays; d++) {
+    int x = startX + col * colWidth + 8;
+    if (d == day) {
+      display.fillRoundRect(x - 4, rowY - 14, 30, 20, 3, GxEPD_BLACK);
+      display.setTextColor(GxEPD_WHITE);
+      display.setCursor(x, rowY); display.printf("%2d", d);
+      display.setTextColor(GxEPD_BLACK);
+    } else { display.setCursor(x, rowY); display.printf("%2d", d); }
+    col++; if (col > 6) { col = 0; rowY += rowHeight; }
+  }
+  display.drawLine(10, 255, 390, 255, GxEPD_BLACK);
+  drawBottomBar();
+  drawCachedBadge();
+}
+
+void drawWeatherView() {
+  display.fillScreen(GxEPD_WHITE);
+  display.setTextColor(GxEPD_BLACK);
+  drawCentered(&FreeSansBold12pt7b, "Daejeon Weather", 28);
+  display.drawLine(10, 36, 390, 36, GxEPD_BLACK);
+  if (!fcValid) {
+    drawCentered(&FreeSans9pt7b, "No weather data", 150);
+    drawCentered(&FreeSans9pt7b, "Weather Mode", 285);
+    drawCachedBadge();
+    return;
+  }
+  int colW = SCREEN_W / WEATHER_SLOTS;
+  for (int i = 0; i < WEATHER_SLOTS; i++) {
+    if (fcHour[i] < 0) continue;
+    int cx = i * colW;
+    char buf[12];
+    sprintf(buf, "%02dh", fcHour[i]);
+    drawCenteredIn(&FreeSans9pt7b, buf, cx, colW, 70);
+    int iconX = cx + (colW - ICON_W) / 2;
+    display.drawBitmap(iconX, 85, weatherIcon(fcCode[i]), ICON_W, ICON_H, GxEPD_BLACK);
+    sprintf(buf, "%dC", fcTemp[i]);
+    drawCenteredIn(&FreeSans9pt7b, buf, cx, colW, 145);
+    sprintf(buf, "%d%%", fcHumid[i]);
+    drawCenteredIn(&FreeSans9pt7b, buf, cx, colW, 180);
+    if (i > 0) display.drawLine(cx, 50, cx, 205, GxEPD_BLACK);
+  }
+  display.drawLine(20, 255, 380, 255, GxEPD_BLACK);
+  // 캐시 상태면 마지막 동기화 시각, 아니면 모드명
+  if (isShowingCached()) {
+    char ssbuf[48];
+    sprintf(ssbuf, "Cached %02d-%02d %02d:%02d",
+            lastSyncMonth, lastSyncDay, lastSyncHour, lastSyncMin);
+    drawCentered(&FreeSans9pt7b, ssbuf, 285);
+  } else {
+    drawCentered(&FreeSans9pt7b, "Weather Mode", 285);
+  }
+  drawCachedBadge();
+}
+
+// ══════════════════════════════════════
+// 날씨+미세먼지 종합 화면
+// ══════════════════════════════════════
+void drawAirEnvView() {
+  display.fillScreen(GxEPD_WHITE);
+  display.setTextColor(GxEPD_BLACK);
+
+  int slot = pickSlotByNow();
+  uint8_t repCode  = fcValid ? fcCode[slot]  : 0;
+  uint8_t repHumid = fcValid ? fcHumid[slot] : 0;
+
+  char title[32];
+  sprintf(title, "DAEJEON  %s", dayNamesShort[weekday]);
+  display.setFont(&FreeSansBold9pt7b);
+  display.setCursor(20, 24);
+  display.print(title);
+  display.drawLine(20, 32, 380, 32, GxEPD_BLACK);
+
+  drawBitmap2x(28, 45, weatherIcon(repCode), 2);
+
+  char buf[40];
+  display.setFont(&FreeMonoBold24pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  if (fcValid || envValid) sprintf(buf, "%d", todayMax);
+  else                     sprintf(buf, "--");
+  display.setCursor(110, 80);
+  display.print(buf);
+  int16_t cx = display.getCursorX();
+  display.drawCircle(cx + 8, 52, 4, GxEPD_BLACK);
+  display.drawCircle(cx + 8, 52, 3, GxEPD_BLACK);
+
+  display.setFont(&FreeSans9pt7b);
+  display.setCursor(110, 100);
+  sprintf(buf, "Low %dC", todayMin);
+  display.print(buf);
+  display.setCursor(210, 100);
+  sprintf(buf, "Humid %d%%", repHumid);
+  display.print(buf);
+  display.setCursor(310, 100);
+  sprintf(buf, "Rain %d%%", todayPop);
+  display.print(buf);
+
+  display.drawLine(20, 115, 380, 115, GxEPD_BLACK);
+
+  display.setFont(&FreeSansBold9pt7b);
+  display.setCursor(20, 138);
+  display.print("AIR QUALITY");
+
+  display.setFont(&FreeSans9pt7b);
+  display.setCursor(20, 165);
+  if (envValid) {
+    sprintf(buf, "PM2.5 : %d ug", pm25);
+    display.print(buf);
+
+    int barX = 150, barY = 153, barW = 160, barH = 14;
+    display.drawRect(barX, barY, barW, barH, GxEPD_BLACK);
+    int aqiClamped = usAqi > 300 ? 300 : usAqi;
+    int fillW = (barW - 2) * aqiClamped / 300;
+    if (fillW > 0) display.fillRect(barX + 1, barY + 1, fillW, barH - 2, GxEPD_BLACK);
+
+    display.setCursor(barX + barW + 8, 165);
+    sprintf(buf," %d", usAqi);
+    display.print(buf);
+
+    const char* grade = aqiGrade(usAqi);
+    display.setFont(&FreeSansBold9pt7b);
+    int16_t gx, gy; uint16_t gw, gh;
+    display.getTextBounds(grade, 0, 0, &gx, &gy, &gw, &gh);
+    int gradeX = 20, gradeY = 180;
+    display.fillRoundRect(gradeX, gradeY, gw + 16, 24, 4, GxEPD_BLACK);
+    display.setTextColor(GxEPD_WHITE);
+    display.setCursor(gradeX + 8 - gx, gradeY + 17);
+    display.print(grade);
+    display.setTextColor(GxEPD_BLACK);
+  } else {
+    display.print("No air data");
+  }
+
+  display.drawLine(20, 210, 380, 210, GxEPD_BLACK);
+
+  if (!appliedCfg.aiEnabled) {
+    display.setFont(&FreeSans9pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    drawCentered(&FreeSans9pt7b, "AI comment off", 250);
+  } else if (aiCommentValid && aiComment[0] != '\0') {
+    display.fillRect(20, 222, 4, 56, GxEPD_BLACK);
+    drawWrappedText(&FreeSans9pt7b, aiComment, 34, 240, 346, 22, 2);
+  } else {
+    display.setFont(&FreeSans9pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    // 통신 실패로 캐시도 없을 때와 단순 대기 구분
+    if (isShowingCached())
+      drawCentered(&FreeSans9pt7b, "No AI (offline)", 250);
+    else
+      drawCentered(&FreeSans9pt7b, "Requesting AI...", 250);
+  }
+
+  drawCachedBadge();
+}
+
+void drawInfoView() {
+  display.fillScreen(GxEPD_WHITE);
+  display.setTextColor(GxEPD_BLACK);
+  drawCentered(&FreeSansBold12pt7b, "System Info", 30);
+  display.drawLine(20, 40, 380, 40, GxEPD_BLACK);
+  display.setFont(&FreeSans9pt7b);
+  int y = 64, lineH = 21;
+  display.setCursor(20, y); display.printf("Boot count: %d", bootCount); y += lineH;
+  display.setCursor(20, y); display.printf("ESP-NOW CH: %d (auto)", savedChannel); y += lineH;
+  display.setCursor(20, y); display.printf("Data: %s", gotFreshData ? "LIVE" : (everGotData ? "CACHED" : "NONE")); y += lineH;
+  display.setCursor(20, y); display.printf("Cfg ver: %d  Wake:%dh  AI:%s",
+                    lastCfgVersion, appliedCfg.wakeHour, appliedCfg.aiEnabled ? "Y" : "N"); y += lineH;
+  display.setCursor(20, y); display.printf("Timeout:%ds  FullRef:%d",
+                    appliedCfg.sleepTimeoutSec, appliedCfg.fullRefreshEvery); y += lineH;
+  display.setCursor(20, y);
+  if (everGotData)
+    display.printf("Last sync: %02d-%02d %02d:%02d", lastSyncMonth, lastSyncDay, lastSyncHour, lastSyncMin);
+  else
+    display.print("Last sync: never");
+  y += lineH;
+  display.setCursor(20, y); display.printf("A MAC: %s", WiFi.macAddress().c_str()); y += lineH;
+  display.setCursor(20, y); display.printf("Temp: %.1f C  Hum: %.0f%%", lastTemp, lastHumidity);
+  display.drawLine(20, 255, 380, 255, GxEPD_BLACK);
+  drawCentered(&FreeSans9pt7b, "Info Mode", 285);
+}
+
+// fetch=true: B와 통신 후 갱신 / fetch=false: 통신 없이 현재 데이터로 화면만 그림
+void refreshDisplay(bool fetch = true) {
+  if (fetch) {
+    requestSensorData();
+    if (currentMode == MODE_AIRENV && appliedCfg.aiEnabled) requestAIComment();
+  }
+
+  epdPowerOn();
+  display.init(115200, true, 50, false);
+  display.setRotation(0);
+  display.setFullWindow();
+
+  bool doFullRefresh = (partialRefreshCount >= appliedCfg.fullRefreshEvery);
+
+  switch (currentMode) {
+    case MODE_CALENDAR: if (calendarView == 0) drawDayView(); else drawMonthView(); break;
+    case MODE_SENSOR:   drawWeatherView(); break;
+    case MODE_AIRENV:   drawAirEnvView(); break;
+    case MODE_INFO:     drawInfoView(); break;
+  }
+
+  if (doFullRefresh) { display.display(false); partialRefreshCount = 0; }
+  else { display.display(true); partialRefreshCount++; }
+
+  display.hibernate();
+  epdPowerOff();
+}
+
+void enterDeepSleep() {
+  esp_now_deinit();
+  WiFi.mode(WIFI_OFF);
+  if (currentMode != MODE_CALENDAR) {
+    currentMode = MODE_CALENDAR;
+    refreshDisplay(false);   // ★ 통신 없이 캘린더 화면만 다시 그림
+  }
+  showSleepIndicator();
+
+  uint64_t sleepTime;
+  if (timeEverSynced) {
+    int wakeHour = appliedCfg.wakeHour;
+    int sec;
+    if (hour < wakeHour) sec = ((wakeHour - hour) * 3600) - (minute * 60);
+    else                 sec = ((24 - hour + wakeHour) * 3600) - (minute * 60);
+    if (sec <= 0) sec = 3600;
+    sleepTime = (uint64_t)sec * 1000000ULL;
+  } else {
+    sleepTime = REFRESH_INTERVAL_SEC * 1000000ULL;
+  }
+
+  esp_sleep_enable_timer_wakeup(sleepTime);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_2, LOW);
+  uint64_t btnMask = (1ULL << BTN_EXIT) | (1ULL << BTN_UP) |
+                     (1ULL << BTN_DOWN) | (1ULL << BTN_OK);
+  esp_sleep_enable_ext1_wakeup(btnMask, ESP_EXT1_WAKEUP_ANY_LOW);
+
+  Serial.println("Deep Sleep...");
+  Serial.flush();
+  esp_deep_sleep_start();
+}
+
+void infoLoop() {
+  resetActivityTimer();
+  while (!isTimeoutReached()) {
+    if (isButtonPressed(BTN_EXIT)) {
+      waitButtonRelease(BTN_EXIT);
+      currentMode = MODE_CALENDAR; exitReason = EXIT_MODE_CHANGE; return;
+    }
+    if (isButtonPressed(BTN_UP)) {
+      waitButtonRelease(BTN_UP);
+      currentMode = (currentMode == MODE_INFO) ? MODE_CALENDAR : (currentMode + 1) % DIAL_MODE_COUNT;
+      exitReason = EXIT_MODE_CHANGE; return;
+    }
+    if (isButtonPressed(BTN_DOWN)) {
+      waitButtonRelease(BTN_DOWN);
+      currentMode = (currentMode == MODE_INFO) ? MODE_AIRENV : (currentMode - 1 + DIAL_MODE_COUNT) % DIAL_MODE_COUNT;
+      exitReason = EXIT_MODE_CHANGE; return;
+    }
+    if (isButtonPressed(BTN_OK)) { waitButtonRelease(BTN_OK); refreshDisplay(); resetActivityTimer(); }
+    if (isButtonPressed(BTN_MENU)) { waitButtonRelease(BTN_MENU); }
+    delay(50);
+  }
+  currentMode = MODE_CALENDAR; exitReason = EXIT_MODE_CHANGE;
+}
+
+void activeLoop() {
+  resetActivityTimer();
+  while (!isTimeoutReached()) {
+    if (isButtonPressed(BTN_MENU)) {
+      if (currentMode == MODE_CALENDAR) {
+        calendarView = (calendarView == 0) ? 1 : 0;
+        refreshDisplay();
+      }
+      waitButtonRelease(BTN_MENU); resetActivityTimer();
+    }
+    if (isButtonPressed(BTN_UP)) {
+      waitButtonRelease(BTN_UP);
+      currentMode = (currentMode + 1) % DIAL_MODE_COUNT;
+      exitReason = EXIT_MODE_CHANGE; return;
+    }
+    if (isButtonPressed(BTN_DOWN)) {
+      waitButtonRelease(BTN_DOWN);
+      currentMode = (currentMode - 1 + DIAL_MODE_COUNT) % DIAL_MODE_COUNT;
+      exitReason = EXIT_MODE_CHANGE; return;
+    }
+    if (isButtonPressed(BTN_OK)) { refreshDisplay(); waitButtonRelease(BTN_OK); resetActivityTimer(); }
+    if (isButtonPressed(BTN_EXIT)) {
+      waitButtonRelease(BTN_EXIT);
+      currentMode = MODE_INFO; exitReason = EXIT_MODE_CHANGE; return;
+    }
+    delay(50);
+  }
+  exitReason = EXIT_TIMEOUT;
+}
+
+void modeDispatcher() {
+  while (true) {
+    exitReason = EXIT_TIMEOUT;
+    refreshDisplay();
+    switch (currentMode) {
+      case MODE_CALENDAR:
+      case MODE_SENSOR:
+      case MODE_AIRENV:
+        activeLoop();
+        if (exitReason == EXIT_TIMEOUT) return;
+        break;
+      case MODE_INFO:
+        infoLoop();
+        break;
+    }
+    if (exitReason == EXIT_TIMEOUT) return;
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  bootCount++;
+  Serial.printf("Boot #%d Mode:%d\n", bootCount, currentMode);
+
+  pinMode(BTN_MENU, INPUT);
+  pinMode(BTN_EXIT, INPUT);
+  pinMode(BTN_UP, INPUT);
+  pinMode(BTN_DOWN, INPUT);
+  pinMode(BTN_OK, INPUT);
+
+  // 채널은 마지막 성공 채널을 우선 사용 (첫 부팅이면 기본값)
+  if (savedChannel < CH_MIN || savedChannel > CH_MAX) savedChannel = DEFAULT_CHANNEL;
+  initESPNow();
+
+  esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
+  Serial.printf("Wakeup: %d\n", wakeup);
+
+  // 타이머(정기 기상)로 깨어났으면 캘린더 모드로 시작
+  if (wakeup == ESP_SLEEP_WAKEUP_TIMER) {
+    currentMode = MODE_CALENDAR;
+  }
+
+  modeDispatcher();
+  enterDeepSleep();
+}
+
+void loop() {}

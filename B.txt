@@ -1,0 +1,1055 @@
+#include <WiFi.h>
+#include <esp_now.h>
+#include <WebServer.h>
+#include <Preferences.h>
+#include <Wire.h>
+#include <Adafruit_SSD1306.h>
+#include <DHT.h>
+#include <time.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <ArduinoJson.h>
+
+// ── 핀 정의 ──
+#define PIN_DHT    1
+#define PIN_LIGHT  2
+#define PIN_PIR    3
+
+#define OLED_SDA   17
+#define OLED_SCL   18
+#define OLED_RST   21
+#define OLED_ADDR  0x3C
+#define VEXT_PIN   36
+
+// ── DHT11 ──
+#define DHT_TYPE DHT11
+DHT dht(PIN_DHT, DHT_TYPE);
+
+// ── A 보드 MAC ──
+uint8_t peerMAC_A[] = {0x10, 0xB4, 0x1D, 0xE8, 0xC2, 0x4C};
+
+// ── C 보드 MAC ──
+// ※ C를 한 번 부팅해서 시리얼에 찍히는 "C MAC: xx:xx:..." 값을 여기에 넣으세요!
+uint8_t peerMAC_C[] = {0x04, 0xB2, 0x47, 0x93, 0xC3, 0x38};
+
+// ── 시간별 날씨 슬롯 ──
+#define WEATHER_SLOTS 6
+
+// ── AI 멘트 chunk 설정 (A와 동일해야 함) ──
+#define AI_CHUNK_SIZE   200
+#define AI_MAX_CHUNKS   4
+#define AI_BUF_SIZE     (AI_CHUNK_SIZE * AI_MAX_CHUNKS)
+
+// ── 설정 기본값 (DEFAULT) — "초기 설정 복원" 기준 ──
+#define DEF_WAKE_HOUR          7
+#define DEF_SLEEP_TIMEOUT_SEC  10
+#define DEF_FULL_REFRESH       15
+#define DEF_AI_ENABLED         1
+#define DEF_LAT                36.3504f
+#define DEF_LON                127.3845f
+
+// ── 설정 구조체 (A와 동일) ──
+typedef struct {
+  uint8_t  wakeHour;
+  uint16_t sleepTimeoutSec;
+  uint8_t  fullRefreshEvery;
+  uint8_t  aiEnabled;
+  float    lat;
+  float    lon;
+  uint16_t configVersion;
+} BoardConfig;
+
+BoardConfig g_cfg;
+
+// ── 통신 구조체 (A와 동일해야 함) ──
+typedef struct {
+  uint8_t msgType;
+  float   temperature;
+  float   humidity;
+  int     year;
+  int     month;
+  int     day;
+  int     weekday;
+  int     hour;
+  int     minute;
+  int8_t  fcHour[WEATHER_SLOTS];
+  int8_t  fcTemp[WEATHER_SLOTS];
+  uint8_t fcHumid[WEATHER_SLOTS];
+  uint8_t fcCode[WEATHER_SLOTS];
+  int8_t  todayMax;
+  int8_t  todayMin;
+  uint8_t todayPop;
+  uint8_t pm25;
+  uint8_t usAqi;
+  BoardConfig config;   // ★ A로 설정 전달
+} Message;
+
+// ── AI 멘트 chunk 구조체 (A와 동일해야 함) ──
+typedef struct {
+  uint8_t  msgType;
+  uint8_t  totalChunks;
+  uint8_t  chunkIndex;
+  uint8_t  dataLen;
+  uint8_t  commentDay;
+  char     data[AI_CHUNK_SIZE];
+} AIChunk;
+
+#define MSG_REQUEST     0
+#define MSG_SENSOR_DATA 1
+#define MSG_AI_REQUEST  2
+#define MSG_AI_CHUNK    3
+
+// ══════════════════════════════════════
+// C 보드 통신
+// ══════════════════════════════════════
+#define MSG_C_REQUEST  10
+#define MSG_C_DATA     11
+
+#define CMODE_DEFAULT  0
+#define CMODE_AUTO     1
+#define OUT_BOTH  0
+#define OUT_FAN   1
+#define OUT_LED   2
+
+typedef struct {
+  uint8_t  cMode;
+  uint8_t  cOutput;
+  uint16_t cfgVersion;
+} CConfig;
+
+typedef struct {
+  uint8_t  msgType;     // MSG_C_DATA
+  float    temperature;
+  int      lightLevel;
+  uint8_t  motion;
+  CConfig  config;
+} CMessage;
+
+typedef struct {
+  uint8_t msgType;      // MSG_C_REQUEST
+} CRequest;
+
+// C 설정 (NVS에 저장)
+CConfig g_cCfg = { CMODE_DEFAULT, OUT_BOTH, 1 };
+
+// ── OLED ──
+Adafruit_SSD1306 oled(128, 64, &Wire, OLED_RST);
+
+// ── WiFi ──
+Preferences prefs;
+String savedSSID = "";
+String savedPASS = "";
+bool wifiConnected = false;
+bool apMode = false;
+
+#define AP_SSID "DualCore-Setup"
+#define AP_PASS "12345678"
+WebServer server(80);
+
+// ── NTP (KST) ──
+#define NTP_SERVER  "pool.ntp.org"
+#define GMT_OFFSET  (9 * 3600)
+#define DST_OFFSET  0
+bool timeSync = false;
+
+// ── 날씨 갱신 주기 ──
+#define WEATHER_FETCH_INTERVAL_MS  (30UL * 60 * 1000)
+
+int8_t  g_fcHour[WEATHER_SLOTS];
+int8_t  g_fcTemp[WEATHER_SLOTS];
+uint8_t g_fcHumid[WEATHER_SLOTS];
+uint8_t g_fcCode[WEATHER_SLOTS];
+bool    g_weatherValid = false;
+unsigned long g_lastWeatherFetch = 0;
+
+// ── 오늘 종합값 ──
+int8_t  g_todayMax = 0;
+int8_t  g_todayMin = 0;
+uint8_t g_todayPop = 0;
+uint8_t g_pm25 = 0;
+uint8_t g_usAqi = 0;
+bool    g_envValid = false;
+
+// ══════════════════════════════════════
+// Gemini API 설정
+// ══════════════════════════════════════
+#define GEMINI_API_KEY  "AQ.Ab8RN6L0PEoXgZM3chd5GLUB-KVllFoT4W39EyJFz5EIifKrDg"
+#define GEMINI_MODEL    "gemini-3.1-flash-lite"
+
+// ── AI 멘트 저장 ──
+char g_aiComment[AI_BUF_SIZE] = "";
+int  g_aiCommentDay  = -1;
+bool g_aiCommentValid = false;
+
+// ── 센서 값 ──
+float temperature = 0.0;
+float humidity = 0.0;
+int   lightLevel = 0;
+bool  motionState = false;
+unsigned long lastMotionTime = 0;
+#define MOTION_HOLD_MS 3000
+
+bool requestReceived = false;
+unsigned long requestDisplayTime = 0;
+#define REQUEST_DISPLAY_MS 5000
+
+String statusLine = "Booting...";
+
+// ══════════════════════════════════════
+// 설정값 NVS 저장 / 복원 / 기본값
+// ══════════════════════════════════════
+void setDefaultConfig() {
+  g_cfg.wakeHour         = DEF_WAKE_HOUR;
+  g_cfg.sleepTimeoutSec  = DEF_SLEEP_TIMEOUT_SEC;
+  g_cfg.fullRefreshEvery = DEF_FULL_REFRESH;
+  g_cfg.aiEnabled        = DEF_AI_ENABLED;
+  g_cfg.lat              = DEF_LAT;
+  g_cfg.lon              = DEF_LON;
+  // configVersion 은 호출부에서 관리 (변경 전파 위해 증가시킴)
+}
+
+void saveConfigToNVS() {
+  prefs.begin("cfg", false);
+  prefs.putUChar("wake",   g_cfg.wakeHour);
+  prefs.putUShort("slpto", g_cfg.sleepTimeoutSec);
+  prefs.putUChar("fullr",  g_cfg.fullRefreshEvery);
+  prefs.putUChar("ai",     g_cfg.aiEnabled);
+  prefs.putFloat("lat",    g_cfg.lat);
+  prefs.putFloat("lon",    g_cfg.lon);
+  prefs.putUShort("ver",   g_cfg.configVersion);
+  prefs.end();
+  Serial.printf("[CFG] saved (ver %d)\n", g_cfg.configVersion);
+}
+
+void loadConfigFromNVS() {
+  setDefaultConfig();
+  prefs.begin("cfg", true);
+  g_cfg.wakeHour         = prefs.getUChar("wake",  DEF_WAKE_HOUR);
+  g_cfg.sleepTimeoutSec  = prefs.getUShort("slpto",DEF_SLEEP_TIMEOUT_SEC);
+  g_cfg.fullRefreshEvery = prefs.getUChar("fullr", DEF_FULL_REFRESH);
+  g_cfg.aiEnabled        = prefs.getUChar("ai",    DEF_AI_ENABLED);
+  g_cfg.lat              = prefs.getFloat("lat",   DEF_LAT);
+  g_cfg.lon              = prefs.getFloat("lon",   DEF_LON);
+  g_cfg.configVersion    = prefs.getUShort("ver",  1);
+  prefs.end();
+  Serial.printf("[CFG] loaded (ver %d)\n", g_cfg.configVersion);
+}
+
+// ══════════════════════════════════════
+// C 보드 설정 NVS 저장 / 복원
+// ══════════════════════════════════════
+void saveCConfigToNVS() {
+  prefs.begin("ccfg", false);
+  prefs.putUChar("mode",   g_cCfg.cMode);
+  prefs.putUChar("output", g_cCfg.cOutput);
+  prefs.putUShort("ver",   g_cCfg.cfgVersion);
+  prefs.end();
+  Serial.printf("[CCFG] saved mode=%d out=%d ver=%d\n",
+                g_cCfg.cMode, g_cCfg.cOutput, g_cCfg.cfgVersion);
+}
+
+void loadCConfigFromNVS() {
+  prefs.begin("ccfg", true);
+  g_cCfg.cMode      = prefs.getUChar("mode",   CMODE_DEFAULT);
+  g_cCfg.cOutput    = prefs.getUChar("output", OUT_BOTH);
+  g_cCfg.cfgVersion = prefs.getUShort("ver",   1);
+  prefs.end();
+  Serial.printf("[CCFG] loaded mode=%d out=%d ver=%d\n",
+                g_cCfg.cMode, g_cCfg.cOutput, g_cCfg.cfgVersion);
+}
+
+// ══════════════════════════════════════
+// AI 멘트 NVS 저장 / 복원
+// ══════════════════════════════════════
+void saveCommentToNVS() {
+  prefs.begin("ai", false);
+  prefs.putString("comment", g_aiComment);
+  prefs.putInt("day", g_aiCommentDay);
+  prefs.end();
+  Serial.println("[NVS] comment saved");
+}
+
+void loadCommentFromNVS() {
+  prefs.begin("ai", true);
+  String c = prefs.getString("comment", "");
+  int d = prefs.getInt("day", -1);
+  prefs.end();
+  if (c.length() > 0 && d >= 0) {
+    strncpy(g_aiComment, c.c_str(), AI_BUF_SIZE - 1);
+    g_aiComment[AI_BUF_SIZE - 1] = '\0';
+    g_aiCommentDay = d;
+    g_aiCommentValid = true;
+    Serial.printf("[NVS] comment restored (day %d): %s\n", d, g_aiComment);
+  } else {
+    Serial.println("[NVS] no saved comment");
+  }
+}
+
+void clearCommentNVS() {
+  prefs.begin("ai", false);
+  prefs.clear();
+  prefs.end();
+}
+
+// ══════════════════════════════════════
+// 센서 읽기
+// ══════════════════════════════════════
+void readSensors() {
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+  if (!isnan(t)) temperature = t;
+  if (!isnan(h)) humidity = h;
+  lightLevel = analogRead(PIN_LIGHT);
+  if (digitalRead(PIN_PIR) == HIGH) {
+    motionState = true; lastMotionTime = millis();
+  } else if (millis() - lastMotionTime > MOTION_HOLD_MS) {
+    motionState = false;
+  }
+}
+
+bool getTime(struct tm *info) { return getLocalTime(info, 1000); }
+
+// ══════════════════════════════════════
+// 날씨 API (Open-Meteo)
+// ══════════════════════════════════════
+bool fetchWeather() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  char url[360];
+  snprintf(url, sizeof(url),
+    "http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+    "&hourly=temperature_2m,relative_humidity_2m,weather_code,precipitation_probability"
+    "&daily=temperature_2m_max,temperature_2m_min"
+    "&timezone=Asia%%2FSeoul&forecast_days=1",
+    g_cfg.lat, g_cfg.lon);
+
+  HTTPClient http;
+  http.begin(url);
+  int code = http.GET();
+  if (code != 200) { Serial.printf("[Weather] HTTP %d\n", code); http.end(); return false; }
+
+  String payload = http.getString();
+  http.end();
+
+  StaticJsonDocument<384> filter;
+  filter["hourly"]["temperature_2m"] = true;
+  filter["hourly"]["relative_humidity_2m"] = true;
+  filter["hourly"]["weather_code"] = true;
+  filter["hourly"]["precipitation_probability"] = true;
+  filter["daily"]["temperature_2m_max"] = true;
+  filter["daily"]["temperature_2m_min"] = true;
+
+  DynamicJsonDocument doc(10240);
+  DeserializationError err = deserializeJson(doc, payload,
+                                DeserializationOption::Filter(filter));
+  if (err) { Serial.printf("[Weather] JSON err: %s\n", err.c_str()); return false; }
+
+  JsonArray temps = doc["hourly"]["temperature_2m"];
+  JsonArray hums  = doc["hourly"]["relative_humidity_2m"];
+  JsonArray codes = doc["hourly"]["weather_code"];
+  JsonArray pops  = doc["hourly"]["precipitation_probability"];
+
+  if (temps.isNull() || temps.size() == 0) { Serial.println("[Weather] empty"); return false; }
+
+  uint8_t maxPop = 0;
+  for (int i = 0; i < WEATHER_SLOTS; i++) {
+    int idx = i * 4;
+    if (idx >= (int)temps.size()) { g_fcHour[i] = -1; continue; }
+    g_fcHour[i]  = idx;
+    g_fcTemp[i]  = (int8_t)lround((double)temps[idx]);
+    g_fcHumid[i] = (uint8_t)(int)hums[idx];
+    g_fcCode[i]  = (uint8_t)(int)codes[idx];
+  }
+  for (int i = 0; i < (int)pops.size(); i++) {
+    int p = (int)pops[i];
+    if (p > maxPop) maxPop = p;
+  }
+  g_todayPop = maxPop;
+
+  JsonArray tmax = doc["daily"]["temperature_2m_max"];
+  JsonArray tmin = doc["daily"]["temperature_2m_min"];
+  if (!tmax.isNull() && tmax.size() > 0) g_todayMax = (int8_t)lround((double)tmax[0]);
+  if (!tmin.isNull() && tmin.size() > 0) g_todayMin = (int8_t)lround((double)tmin[0]);
+
+  g_weatherValid = true;
+  g_lastWeatherFetch = millis();
+  Serial.printf("[Weather] OK  max%d min%d pop%d\n", g_todayMax, g_todayMin, g_todayPop);
+  return true;
+}
+
+// ══════════════════════════════════════
+// 대기질 API (Open-Meteo Air Quality)
+// ══════════════════════════════════════
+bool fetchAirQuality() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  char url[320];
+  snprintf(url, sizeof(url),
+    "http://air-quality-api.open-meteo.com/v1/air-quality?latitude=%.4f&longitude=%.4f"
+    "&hourly=pm2_5,us_aqi&timezone=Asia%%2FSeoul&forecast_days=1",
+    g_cfg.lat, g_cfg.lon);
+
+  HTTPClient http;
+  http.begin(url);
+  int code = http.GET();
+  if (code != 200) { Serial.printf("[Air] HTTP %d\n", code); http.end(); return false; }
+
+  String payload = http.getString();
+  http.end();
+
+  StaticJsonDocument<256> filter;
+  filter["hourly"]["pm2_5"] = true;
+  filter["hourly"]["us_aqi"] = true;
+
+  DynamicJsonDocument doc(8192);
+  DeserializationError err = deserializeJson(doc, payload,
+                                DeserializationOption::Filter(filter));
+  if (err) { Serial.printf("[Air] JSON err: %s\n", err.c_str()); return false; }
+
+  JsonArray pm  = doc["hourly"]["pm2_5"];
+  JsonArray aqi = doc["hourly"]["us_aqi"];
+  if (pm.isNull() || pm.size() == 0) { Serial.println("[Air] empty"); return false; }
+
+  int idx = 0;
+  struct tm ti;
+  if (timeSync && getTime(&ti)) idx = ti.tm_hour;
+  if (idx >= (int)pm.size()) idx = 0;
+
+  g_pm25 = (uint8_t)constrain((int)lround((double)pm[idx]), 0, 255);
+  if (!aqi.isNull() && idx < (int)aqi.size())
+    g_usAqi = (uint8_t)constrain((int)aqi[idx], 0, 255);
+
+  g_envValid = true;
+  Serial.printf("[Air] OK  PM2.5:%d  AQI:%d\n", g_pm25, g_usAqi);
+  return true;
+}
+
+// ══════════════════════════════════════
+// AQI 등급
+// ══════════════════════════════════════
+const char* aqiGradeStr(uint8_t aqi) {
+  if (aqi == 0)   return "Unknown";
+  if (aqi <= 50)  return "Good";
+  if (aqi <= 100) return "Moderate";
+  if (aqi <= 150) return "Unhealthy for sensitive groups";
+  if (aqi <= 200) return "Unhealthy";
+  if (aqi <= 300) return "Very unhealthy";
+  return "Hazardous";
+}
+
+// ══════════════════════════════════════
+// Gemini 호출 → 오늘의 영어 멘트 생성
+// ══════════════════════════════════════
+bool fetchAIComment() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  char prompt[512];
+  snprintf(prompt, sizeof(prompt),
+    "You are a friendly daily assistant for a desk display in Daejeon, Korea. "
+    "Today's data: high %d C, low %d C, rain chance %d%%, "
+    "PM2.5 %d ug/m3, US AQI %d (%s). "
+    "Write ONE short practical life tip in English, max 18 words, "
+    "plain text only, no quotes, no emoji.",
+    g_todayMax, g_todayMin, g_todayPop, g_pm25, g_usAqi, aqiGradeStr(g_usAqi));
+
+  DynamicJsonDocument reqDoc(1024);
+  JsonObject part = reqDoc["contents"][0]["parts"][0].to<JsonObject>();
+  part["text"] = prompt;
+  reqDoc["generationConfig"]["maxOutputTokens"] = 60;
+  reqDoc["generationConfig"]["temperature"] = 0.7;
+
+  String reqBody;
+  serializeJson(reqDoc, reqBody);
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient https;
+  char url[160];
+  snprintf(url, sizeof(url),
+    "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent",
+    GEMINI_MODEL);
+
+  if (!https.begin(client, url)) { Serial.println("[AI] begin fail"); return false; }
+  https.addHeader("Content-Type", "application/json");
+  https.addHeader("x-goog-api-key", GEMINI_API_KEY);
+
+  int code = https.POST(reqBody);
+  if (code != 200) {
+    Serial.printf("[AI] HTTP %d\n", code);
+    Serial.println(https.getString());
+    https.end();
+    return false;
+  }
+
+  String payload = https.getString();
+  https.end();
+
+  StaticJsonDocument<256> filter;
+  filter["candidates"][0]["content"]["parts"][0]["text"] = true;
+
+  DynamicJsonDocument doc(4096);
+  DeserializationError err = deserializeJson(doc, payload,
+                                DeserializationOption::Filter(filter));
+  if (err) { Serial.printf("[AI] JSON err: %s\n", err.c_str()); return false; }
+
+  const char* text = doc["candidates"][0]["content"]["parts"][0]["text"];
+  if (!text) { Serial.println("[AI] no text in response"); return false; }
+
+  String s = String(text);
+  s.trim();
+  s.replace("\n", " ");
+  s.replace("\r", " ");
+  strncpy(g_aiComment, s.c_str(), AI_BUF_SIZE - 1);
+  g_aiComment[AI_BUF_SIZE - 1] = '\0';
+
+  Serial.printf("[AI] comment: %s\n", g_aiComment);
+  return true;
+}
+
+// ══════════════════════════════════════
+// 오늘 멘트 확보
+// ══════════════════════════════════════
+void ensureTodayComment() {
+  if (!g_cfg.aiEnabled) return;          // ★ AI 비활성화 시 생성 안 함
+  if (!timeSync) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  struct tm ti;
+  if (!getTime(&ti)) return;
+  int today = ti.tm_mday;
+
+  if (g_aiCommentValid && g_aiCommentDay == today) return;
+
+  if (!g_weatherValid) fetchWeather();
+  if (!g_envValid)     fetchAirQuality();
+
+   if (!g_weatherValid) {          // ★ 추가: 날씨 확보 실패 시 멘트 생성 보류
+    Serial.println("[AI] weather not ready, skip comment");
+    return;
+  }
+
+  if (fetchAIComment()) {
+    g_aiCommentDay = today;
+    g_aiCommentValid = true;
+    saveCommentToNVS();
+    Serial.printf("[AI] today's comment ready (day %d)\n", today);
+  }
+}
+
+// ══════════════════════════════════════
+// AI 멘트를 chunk로 나눠 A에 전송
+// ══════════════════════════════════════
+void sendAIComment() {
+  int len = strlen(g_aiComment);
+  uint8_t total = (len + AI_CHUNK_SIZE - 1) / AI_CHUNK_SIZE;
+  if (total == 0) total = 1;
+  if (total > AI_MAX_CHUNKS) total = AI_MAX_CHUNKS;
+
+  for (uint8_t i = 0; i < total; i++) {
+    AIChunk ck = {};
+    ck.msgType = MSG_AI_CHUNK;
+    ck.totalChunks = total;
+    ck.chunkIndex = i;
+    ck.commentDay = (uint8_t)(g_aiCommentDay < 0 ? 0 : g_aiCommentDay);
+
+    int off = i * AI_CHUNK_SIZE;
+    int remain = len - off;
+    int n = remain > AI_CHUNK_SIZE ? AI_CHUNK_SIZE : remain;
+    if (n < 0) n = 0;
+    ck.dataLen = n;
+    memcpy(ck.data, g_aiComment + off, n);
+
+    esp_now_send(peerMAC_A, (uint8_t *)&ck, sizeof(AIChunk));
+    delay(20);
+  }
+  Serial.printf("[AI] sent %d chunk(s) to A\n", total);
+}
+
+// ══════════════════════════════════════
+// ESP‑NOW 수신 콜백
+// ══════════════════════════════════════
+void onDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int data_len) {
+  if (data_len == sizeof(Message)) {
+    Message incoming;
+    memcpy(&incoming, data, sizeof(Message));
+    if (incoming.msgType != MSG_REQUEST) return;
+
+    Serial.println("[B] Sensor request from A");
+    readSensors();
+
+    Message response = {};
+    response.msgType = MSG_SENSOR_DATA;
+    response.temperature = temperature;
+    response.humidity = humidity;
+
+    struct tm timeinfo;
+    if (timeSync && getTime(&timeinfo)) {
+      response.year = timeinfo.tm_year + 1900;
+      response.month = timeinfo.tm_mon + 1;
+      response.day = timeinfo.tm_mday;
+      response.weekday = timeinfo.tm_wday;
+      response.hour = timeinfo.tm_hour;
+      response.minute = timeinfo.tm_min;
+    }
+
+    if (g_weatherValid) {
+      memcpy(response.fcHour,  g_fcHour,  sizeof(g_fcHour));
+      memcpy(response.fcTemp,  g_fcTemp,  sizeof(g_fcTemp));
+      memcpy(response.fcHumid, g_fcHumid, sizeof(g_fcHumid));
+      memcpy(response.fcCode,  g_fcCode,  sizeof(g_fcCode));
+    } else {
+      memset(response.fcHour, -1, sizeof(response.fcHour));
+    }
+
+    response.todayMax = g_todayMax;
+    response.todayMin = g_todayMin;
+    response.todayPop = g_todayPop;
+    response.pm25     = g_pm25;
+    response.usAqi    = g_usAqi;
+    response.config   = g_cfg;        // ★ 현재 설정값을 A에게 전달
+
+    esp_now_send(peerMAC_A, (uint8_t *)&response, sizeof(Message));
+
+    requestReceived = true;
+    requestDisplayTime = millis();
+    Serial.printf("[B] Sent sensor (weather:%s air:%s cfgVer:%d)\n",
+                  g_weatherValid ? "Y" : "N", g_envValid ? "Y" : "N", g_cfg.configVersion);
+    return;
+  }
+
+  if (data_len == sizeof(AIChunk)) {
+    AIChunk req;
+    memcpy(&req, data, sizeof(AIChunk));
+    if (req.msgType != MSG_AI_REQUEST) return;
+
+    if (!g_cfg.aiEnabled) {           // ★ AI 비활성화 시
+      Serial.println("[B] AI disabled by config");
+      return;
+    }
+    Serial.println("[B] AI comment request from A");
+    ensureTodayComment();
+    if (g_aiCommentValid && g_aiComment[0] != '\0') {
+      sendAIComment();
+    } else {
+      Serial.println("[B] no comment yet -> A shows 'Requesting AI...'");
+    }
+    return;
+  }
+
+  // ── C 보드 요청 처리 ──
+  if (data_len == sizeof(CRequest)) {
+    CRequest req;
+    memcpy(&req, data, sizeof(CRequest));
+    if (req.msgType != MSG_C_REQUEST) return;
+
+    readSensors();   // 최신 온도/조도/PIR 확보
+
+    CMessage resp = {};
+    resp.msgType     = MSG_C_DATA;
+    resp.temperature = temperature;
+    resp.lightLevel  = lightLevel;
+    resp.motion      = motionState ? 1 : 0;
+    resp.config      = g_cCfg;
+
+    esp_now_send(peerMAC_C, (uint8_t *)&resp, sizeof(CMessage));
+    Serial.printf("[B->C] T=%.1f L=%d PIR=%d mode=%d out=%d ver=%d\n",
+                  temperature, lightLevel, motionState,
+                  g_cCfg.cMode, g_cCfg.cOutput, g_cCfg.cfgVersion);
+    return;
+  }
+}
+
+void onDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
+  Serial.printf("[B SEND] %s\n", status == ESP_NOW_SEND_SUCCESS ? "OK" : "FAIL");
+}
+
+// ══════════════════════════════════════
+// OLED
+// ══════════════════════════════════════
+void updateOLED() {
+  oled.clearDisplay();
+  oled.setTextColor(WHITE);
+  oled.setTextSize(1);
+
+  oled.setCursor(0, 0);
+  struct tm timeinfo;
+  if (timeSync && getTime(&timeinfo)) {
+    oled.printf("%04d-%02d-%02d %02d:%02d:%02d",
+               timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+               timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  } else {
+    oled.print("Time: not synced");
+  }
+
+  oled.setCursor(0, 14);
+  oled.printf("Temp : %.1f C", temperature);
+  oled.setCursor(0, 26);
+  oled.printf("Humid: %.1f %%", humidity);
+  oled.setCursor(0, 38);
+  oled.printf("L:%d PIR:%d C:%s", lightLevel, motionState,
+              g_cCfg.cMode == CMODE_AUTO ? "AUTO" : "DEF");
+
+  oled.setCursor(0, 52);
+  if (requestReceived && (millis() - requestDisplayTime < REQUEST_DISPLAY_MS)) {
+    oled.print("> Sent to A!");
+  } else {
+    requestReceived = false;
+    oled.print(statusLine.c_str());
+  }
+  oled.display();
+}
+
+// ══════════════════════════════════════
+// 웹: 메인 설정 페이지
+// ══════════════════════════════════════
+void handleRoot() {
+  String html = R"rawliteral(
+<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DualCore Settings</title>
+<style>
+body{font-family:sans-serif;margin:0;padding:16px;background:#1a1a2e;color:#eee;}
+.card{background:#16213e;border-radius:10px;padding:16px;margin:12px 0;}
+h2{color:#e94560;margin-top:0;}
+h3{color:#5ad;margin:4px 0 12px;}
+label{display:block;margin:10px 0 4px;font-size:14px;}
+input,select{width:100%;padding:9px;box-sizing:border-box;border-radius:6px;border:none;font-size:15px;}
+button{width:100%;padding:13px;margin-top:14px;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer;}
+.save{background:#0f3460;} .save:hover{background:#0b2548;}
+.reset{background:#7a2222;} .reset:hover{background:#5c1818;}
+.row{display:flex;gap:10px;} .row>div{flex:1;}
+small{color:#9ab;}
+</style></head><body>
+<h2>DualCore Settings</h2>
+<form action="/save" method="POST">
+
+<div class="card">
+<h3>WiFi (B board)</h3>
+<label>SSID</label><input name="ssid" value=")rawliteral";
+  html += savedSSID;
+  html += R"rawliteral(">
+<label>Password</label><input type="password" name="pass" placeholder="(unchanged if empty)">
+</div>
+
+<div class="card">
+<h3>Location (weather)</h3>
+<div class="row">
+<div><label>Latitude</label><input name="lat" value=")rawliteral";
+  html += String(g_cfg.lat, 4);
+  html += R"rawliteral("></div>
+<div><label>Longitude</label><input name="lon" value=")rawliteral";
+  html += String(g_cfg.lon, 4);
+  html += R"rawliteral("></div>
+</div>
+</div>
+
+<div class="card">
+<h3>A board (e-paper)</h3>
+<label>Wake hour (0-23)</label><input type="number" name="wake" min="0" max="23" value=")rawliteral";
+  html += String(g_cfg.wakeHour);
+  html += R"rawliteral(">
+<label>Screen timeout (sec)</label><input type="number" name="slpto" min="3" max="120" value=")rawliteral";
+  html += String(g_cfg.sleepTimeoutSec);
+  html += R"rawliteral(">
+<label>Full refresh every (N)</label><input type="number" name="fullr" min="1" max="50" value=")rawliteral";
+  html += String(g_cfg.fullRefreshEvery);
+  html += R"rawliteral(">
+<label>AI comment</label>
+<select name="ai">
+<option value="1")rawliteral"; html += (g_cfg.aiEnabled?" selected":""); html += R"rawliteral(>Enabled</option>
+<option value="0")rawliteral"; html += (!g_cfg.aiEnabled?" selected":""); html += R"rawliteral(>Disabled</option>
+</select>
+</div>
+
+<div class="card">
+<h3>C board (fan/LED)</h3>
+<label>Mode</label>
+<select name="cmode">
+<option value="0")rawliteral"; html += (g_cCfg.cMode==CMODE_DEFAULT?" selected":""); html += R"rawliteral(>Default (distance)</option>
+<option value="1")rawliteral"; html += (g_cCfg.cMode==CMODE_AUTO?" selected":""); html += R"rawliteral(>Auto (B sensors)</option>
+</select>
+<label>Default-mode output</label>
+<select name="coutput">
+<option value="0")rawliteral"; html += (g_cCfg.cOutput==OUT_BOTH?" selected":""); html += R"rawliteral(>LED + Fan</option>
+<option value="1")rawliteral"; html += (g_cCfg.cOutput==OUT_FAN?" selected":""); html += R"rawliteral(>Fan only</option>
+<option value="2")rawliteral"; html += (g_cCfg.cOutput==OUT_LED?" selected":""); html += R"rawliteral(>LED only</option>
+</select>
+<small>Auto mode uses B's temp/light/PIR and ignores distance.</small>
+</div>
+
+<button class="save" type="submit">Save settings</button>
+</form>
+
+<form action="/factory" method="POST" onsubmit="return confirm('Reset all settings to factory defaults?');">
+<button class="reset" type="submit">Restore factory defaults</button>
+</form>
+
+<div class="card">
+<h3>Status</h3>
+<small>)rawliteral";
+  html += "WiFi: " + savedSSID + "<br>";
+  html += "IP: " + WiFi.localIP().toString() + " | CH: " + String(WiFi.channel()) + "<br>";
+  struct tm ti;
+  if (getTime(&ti)) {
+    char buf[40];
+    sprintf(buf, "Time: %04d-%02d-%02d %02d:%02d:%02d",
+            ti.tm_year+1900, ti.tm_mon+1, ti.tm_mday, ti.tm_hour, ti.tm_min, ti.tm_sec);
+    html += String(buf) + "<br>";
+  }
+  html += "Temp " + String(temperature,1) + "C / Hum " + String(humidity,1) + "%<br>";
+  html += "Light " + String(lightLevel) + " / PIR " + String(motionState) + "<br>";
+  html += "Today max " + String(g_todayMax) + " / min " + String(g_todayMin)
+        + " / rain " + String(g_todayPop) + "%<br>";
+  html += "PM2.5 " + String(g_pm25) + " / AQI " + String(g_usAqi)
+        + " (" + String(aqiGradeStr(g_usAqi)) + ")<br>";
+  html += "AI (day " + String(g_aiCommentDay) + "): "
+        + String(g_aiCommentValid ? g_aiComment : "(none)") + "<br>";
+  html += "Config ver: " + String(g_cfg.configVersion) + "<br>";
+  html += "C mode: " + String(g_cCfg.cMode==CMODE_AUTO?"AUTO":"DEFAULT")
+        + " / out: " + String(g_cCfg.cOutput) + " / ver " + String(g_cCfg.cfgVersion) + "<br>";
+  html += "B MAC: " + WiFi.macAddress();
+  html += R"rawliteral(<br><br>A receives new settings next time it wakes up.<br>ESP-NOW channel: auto-detected by A/C.</small>
+</div>
+<div class="card">
+<a href="/wifireset" style="color:#e94560;" onclick="return confirm('Clear WiFi credentials and reboot?');">Clear WiFi only</a>
+</div>
+</body></html>
+)rawliteral";
+  server.send(200, "text/html", html);
+}
+
+// ══════════════════════════════════════
+// 웹: 설정 저장
+// ══════════════════════════════════════
+void handleSave() {
+  bool wifiChanged = false;
+
+  if (server.hasArg("ssid") && server.arg("ssid").length() > 0) {
+    String ssid = server.arg("ssid");
+    String pass = server.arg("pass");
+    if (ssid != savedSSID) wifiChanged = true;
+    prefs.begin("wifi", false);
+    prefs.putString("ssid", ssid);
+    if (pass.length() > 0) prefs.putString("pass", pass);  // 빈칸이면 기존 유지
+    prefs.end();
+  }
+
+  if (server.hasArg("lat")) g_cfg.lat = server.arg("lat").toFloat();
+  if (server.hasArg("lon")) g_cfg.lon = server.arg("lon").toFloat();
+
+  if (server.hasArg("wake"))  g_cfg.wakeHour         = constrain((int)server.arg("wake").toInt(), 0, 23);
+  if (server.hasArg("slpto")) g_cfg.sleepTimeoutSec  = constrain((int)server.arg("slpto").toInt(), 3, 120);
+  if (server.hasArg("fullr")) g_cfg.fullRefreshEvery = constrain((int)server.arg("fullr").toInt(), 1, 50);
+  if (server.hasArg("ai"))    g_cfg.aiEnabled        = server.arg("ai").toInt() ? 1 : 0;
+
+  // ── C 보드 설정 ──
+  bool cChanged = false;
+  if (server.hasArg("cmode")) {
+    uint8_t m = server.arg("cmode").toInt() ? CMODE_AUTO : CMODE_DEFAULT;
+    if (m != g_cCfg.cMode) { g_cCfg.cMode = m; cChanged = true; }
+  }
+  if (server.hasArg("coutput")) {
+    uint8_t o = constrain((int)server.arg("coutput").toInt(), 0, 2);
+    if (o != g_cCfg.cOutput) { g_cCfg.cOutput = o; cChanged = true; }
+  }
+  if (cChanged) {
+    g_cCfg.cfgVersion++;
+    saveCConfigToNVS();
+  }
+
+  g_cfg.configVersion++;          // ★ 버전 증가 → A가 "새 설정"으로 인식
+  saveConfigToNVS();
+
+  if (wifiConnected) { fetchWeather(); fetchAirQuality(); }
+
+  String msg = "<html><head><meta charset='UTF-8'><meta http-equiv='refresh' content='2;url=/'></head>"
+               "<body style='font-family:sans-serif;background:#1a1a2e;color:#eee;padding:20px;'>"
+               "<h2>Saved.</h2><p>A board will apply on next wake-up.</p>";
+  if (wifiChanged) msg += "<p>WiFi changed - rebooting...</p>";
+  msg += "</body></html>";
+  server.send(200, "text/html", msg);
+
+  if (wifiChanged) { delay(2000); ESP.restart(); }
+}
+
+// ══════════════════════════════════════
+// 웹: 공장 초기화 (설정 기본값 복원)
+// ══════════════════════════════════════
+void handleFactory() {
+  uint16_t v = g_cfg.configVersion;
+  setDefaultConfig();
+  g_cfg.configVersion = v + 1;     // 버전은 증가시켜 A에도 전파
+  saveConfigToNVS();
+
+  // C 설정도 기본값 복원
+  g_cCfg.cMode   = CMODE_DEFAULT;
+  g_cCfg.cOutput = OUT_BOTH;
+  g_cCfg.cfgVersion++;
+  saveCConfigToNVS();
+
+  if (wifiConnected) { fetchWeather(); fetchAirQuality(); }
+  server.send(200, "text/html",
+    "<html><head><meta charset='UTF-8'><meta http-equiv='refresh' content='2;url=/'></head>"
+    "<body style='font-family:sans-serif;background:#1a1a2e;color:#eee;padding:20px;'>"
+    "<h2>Factory defaults restored.</h2></body></html>");
+}
+
+// ══════════════════════════════════════
+// 웹: WiFi만 초기화
+// ══════════════════════════════════════
+void handleWifiReset() {
+  prefs.begin("wifi", false);
+  prefs.clear();
+  prefs.end();
+  clearCommentNVS();
+  server.send(200, "text/html",
+    "<html><body style='font-family:sans-serif;background:#1a1a2e;color:#eee;padding:20px;'>"
+    "<h2>WiFi cleared. Rebooting...</h2></body></html>");
+  delay(2000);
+  ESP.restart();
+}
+
+// ══════════════════════════════════════
+// 라우트 등록 (공통)
+// ══════════════════════════════════════
+void registerRoutes() {
+  server.on("/",         handleRoot);
+  server.on("/save",     HTTP_POST, handleSave);
+  server.on("/factory",  HTTP_POST, handleFactory);
+  server.on("/wifireset",            handleWifiReset);
+}
+
+// ══════════════════════════════════════
+// WiFi 연결
+// ══════════════════════════════════════
+bool connectWiFi() {
+  prefs.begin("wifi", true);
+  savedSSID = prefs.getString("ssid", "");
+  savedPASS = prefs.getString("pass", "");
+  prefs.end();
+  if (savedSSID.length() == 0) return false;
+
+  Serial.printf("Connecting to: %s\n", savedSSID.c_str());
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(500); Serial.print("."); attempts++;
+  }
+  Serial.println();
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("Connected! IP: %s CH:%d\n",
+                  WiFi.localIP().toString().c_str(), WiFi.channel());
+    return true;
+  }
+  Serial.println("WiFi failed");
+  return false;
+}
+
+void startAPMode() {
+  apMode = true;
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP(AP_SSID, AP_PASS);
+  Serial.printf("AP: %s  http://%s\n", AP_SSID, WiFi.softAPIP().toString().c_str());
+  registerRoutes();
+  server.begin();
+  statusLine = "AP:" + String(AP_SSID);
+}
+
+// ══════════════════════════════════════
+// ESP‑NOW
+// ══════════════════════════════════════
+void initESPNow() {
+  if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW init FAILED!"); return; }
+  esp_now_register_recv_cb(onDataRecv);
+  esp_now_register_send_cb(onDataSent);
+
+  esp_now_peer_info_t peerInfo = {};
+  memcpy(peerInfo.peer_addr, peerMAC_A, 6);
+  peerInfo.channel = 0;
+  peerInfo.ifidx = WIFI_IF_STA;
+  peerInfo.encrypt = false;
+  esp_now_add_peer(&peerInfo);
+
+  esp_now_peer_info_t peerC = {};
+  memcpy(peerC.peer_addr, peerMAC_C, 6);
+  peerC.channel = 0;
+  peerC.ifidx = WIFI_IF_STA;
+  peerC.encrypt = false;
+  esp_now_add_peer(&peerC);
+
+  Serial.printf("ESP-NOW ready (B) on CH:%d\n", WiFi.channel());
+}
+
+// ══════════════════════════════════════
+// Setup
+// ══════════════════════════════════════
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  pinMode(VEXT_PIN, OUTPUT);
+  digitalWrite(VEXT_PIN, LOW);
+  delay(100);
+
+  Wire.begin(OLED_SDA, OLED_SCL);
+  oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
+  oled.clearDisplay();
+  oled.display();
+
+  analogReadResolution(12);
+  pinMode(PIN_PIR, INPUT);
+  dht.begin();
+
+  for (int i = 0; i < WEATHER_SLOTS; i++) g_fcHour[i] = -1;
+
+  loadConfigFromNVS();      // ★ 설정 먼저 (날씨 fetch 전 좌표 필요)
+  loadCConfigFromNVS();     // ★ C 보드 설정
+  loadCommentFromNVS();
+
+  if (connectWiFi()) {
+    wifiConnected = true;
+    configTime(GMT_OFFSET, DST_OFFSET, NTP_SERVER);
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 5000)) {
+      timeSync = true;
+      statusLine = "WiFi OK | Waiting...";
+    } else {
+      statusLine = "WiFi OK | NTP fail";
+    }
+
+    fetchWeather();
+    fetchAirQuality();
+    ensureTodayComment();
+
+    registerRoutes();
+    server.begin();
+  } else {
+    startAPMode();
+  }
+
+  initESPNow();
+  Serial.println("B Board ready");
+}
+
+// ══════════════════════════════════════
+// Loop
+// ══════════════════════════════════════
+void loop() {
+  readSensors();
+  updateOLED();
+  server.handleClient();
+
+  if (wifiConnected &&
+      (!g_weatherValid || millis() - g_lastWeatherFetch > WEATHER_FETCH_INTERVAL_MS)) {
+    fetchWeather();
+    fetchAirQuality();
+  }
+
+  ensureTodayComment();
+
+  delay(500);
+}
