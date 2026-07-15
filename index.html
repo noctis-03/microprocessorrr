@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>도쿄 여행 계획표</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -11,55 +13,37 @@
     padding: 20px;
     min-height: 100vh;
   }
-  h1 {
-    text-align: center;
-    color: #1a237e;
-    margin-bottom: 10px;
-  }
-  .subtitle {
-    text-align: center;
-    color: #555;
-    margin-bottom: 20px;
-    font-size: 14px;
-  }
+  h1 { text-align: center; color: #1a237e; margin-bottom: 10px; }
+  .subtitle { text-align: center; color: #555; margin-bottom: 20px; font-size: 14px; }
   .toolbar {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
+    display: flex; justify-content: center; gap: 10px;
+    margin-bottom: 20px; flex-wrap: wrap;
   }
   .btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 25px;
-    background: #1a237e;
-    color: white;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
-    transition: all 0.2s;
+    padding: 10px 20px; border: none; border-radius: 25px;
+    background: #1a237e; color: white; cursor: pointer;
+    font-size: 14px; font-weight: bold; transition: all 0.2s;
   }
   .btn:hover { background: #3949ab; transform: translateY(-2px); }
   .btn.save { background: #43a047; }
   .btn.load { background: #fb8c00; }
   .btn.reset { background: #e53935; }
-  .btn.add { background: #8e24aa; }
 
   .board {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 12px;
-    max-width: 1600px;
+    max-width: 1800px;
     margin: 0 auto;
   }
   .day-column {
-    background: rgba(255,255,255,0.7);
+    background: rgba(255,255,255,0.75);
     border-radius: 15px;
     padding: 12px;
-    min-height: 600px;
     backdrop-filter: blur(10px);
     box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
   }
   .day-header {
     text-align: center;
@@ -72,6 +56,47 @@
   }
   .day-header .date { font-size: 16px; }
   .day-header .day-name { font-size: 12px; opacity: 0.9; margin-top: 3px; }
+  .date[contenteditable="true"]:hover,
+  .day-name[contenteditable="true"]:hover {
+    background: rgba(255,255,255,0.2); border-radius: 4px; cursor: text;
+  }
+  .date[contenteditable="true"]:focus,
+  .day-name[contenteditable="true"]:focus {
+    background: rgba(255,255,255,0.3); outline: none;
+  }
+  .edit-hint {
+    font-size: 9px;
+    opacity: 0.6;
+    margin-top: 2px;
+    font-weight: normal;
+  }
+
+  .map-wrapper {
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .day-map {
+    width: 100%;
+    height: 200px;
+    border-radius: 10px;
+    border: 2px solid #e0e0e0;
+    z-index: 1;
+  }
+  .map-expand-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 500;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    font-weight: bold;
+  }
+  .map-expand-btn:hover { background: #1a237e; color: white; }
 
   .block {
     background: white;
@@ -87,102 +112,124 @@
   .block:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(-1px); }
   .block:active { cursor: grabbing; }
   .block.dragging { opacity: 0.4; }
-  .block.drag-over { border-top: 3px solid #ff4081; }
+  .block.highlighted { box-shadow: 0 0 0 3px #ff4081, 0 4px 12px rgba(0,0,0,0.2); }
 
-  /* 카테고리별 색상 */
   .block[data-cat="food"] { border-left-color: #f4511e; background: #fff3e0; }
   .block[data-cat="sight"] { border-left-color: #1e88e5; background: #e3f2fd; }
   .block[data-cat="shop"] { border-left-color: #8e24aa; background: #f3e5f5; }
   .block[data-cat="play"] { border-left-color: #43a047; background: #e8f5e9; }
   .block[data-cat="move"] { border-left-color: #757575; background: #eeeeee; }
-  .block[data-cat="empty"] { border-left-color: #bdbdbd; background: #fafafa; border-style: dashed; border: 2px dashed #bdbdbd; }
+  .block[data-cat="hotel"] { border-left-color: #d81b60; background: #fce4ec; }
+  .block[data-cat="empty"] { border-left-color: #bdbdbd; background: #fafafa; border: 2px dashed #bdbdbd; }
 
   .block-time {
-    font-size: 11px;
-    font-weight: bold;
-    color: #1a237e;
-    padding: 2px 6px;
-    background: rgba(26,35,126,0.1);
-    border-radius: 4px;
-    display: inline-block;
-    cursor: text;
+    font-size: 11px; font-weight: bold; color: #1a237e;
+    padding: 2px 6px; background: rgba(26,35,126,0.1);
+    border-radius: 4px; display: inline-block; cursor: text;
+  }
+  .marker-num {
+    display: inline-block; width: 18px; height: 18px;
+    background: #1a237e; color: white; border-radius: 50%;
+    font-size: 10px; text-align: center; line-height: 18px;
+    margin-right: 4px; font-weight: bold;
   }
   .block-title {
-    font-size: 13px;
-    font-weight: bold;
-    margin: 5px 0 3px 0;
-    color: #212121;
-    cursor: text;
-    word-break: keep-all;
+    font-size: 13px; font-weight: bold; margin: 5px 0 3px 0;
+    color: #212121; cursor: text; word-break: keep-all;
   }
   .block-desc {
-    font-size: 11px;
-    color: #555;
-    cursor: text;
-    line-height: 1.4;
-    word-break: keep-all;
+    font-size: 11px; color: #555; cursor: text;
+    line-height: 1.4; word-break: keep-all;
   }
   .block-cat {
-    display: inline-block;
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 8px;
-    background: rgba(0,0,0,0.05);
-    margin-top: 4px;
+    display: inline-block; font-size: 10px;
+    padding: 1px 6px; border-radius: 8px;
+    background: rgba(0,0,0,0.05); margin-top: 4px;
   }
   .delete-btn {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 18px;
-    height: 18px;
-    border: none;
-    border-radius: 50%;
-    background: #e53935;
-    color: white;
-    font-size: 10px;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.2s;
-    line-height: 1;
+    position: absolute; top: 4px; right: 4px;
+    width: 18px; height: 18px; border: none; border-radius: 50%;
+    background: #e53935; color: white; font-size: 10px;
+    cursor: pointer; opacity: 0; transition: opacity 0.2s; line-height: 1;
   }
   .block:hover .delete-btn { opacity: 1; }
 
   .add-block-btn {
-    width: 100%;
-    padding: 8px;
-    border: 2px dashed #9e9e9e;
-    background: transparent;
-    border-radius: 10px;
-    color: #757575;
-    cursor: pointer;
-    font-size: 12px;
-    margin-top: 5px;
-    transition: all 0.2s;
+    width: 100%; padding: 8px;
+    border: 2px dashed #9e9e9e; background: transparent;
+    border-radius: 10px; color: #757575; cursor: pointer;
+    font-size: 12px; margin-top: 5px; transition: all 0.2s;
   }
   .add-block-btn:hover { border-color: #1a237e; color: #1a237e; background: rgba(26,35,126,0.05); }
 
   .legend {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin: 15px 0;
-    flex-wrap: wrap;
-    font-size: 12px;
+    display: flex; justify-content: center; gap: 15px;
+    margin: 15px 0; flex-wrap: wrap; font-size: 12px;
   }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-color { width: 14px; height: 14px; border-radius: 3px; }
+
+  .custom-marker {
+    background: #1a237e; color: white;
+    border-radius: 50%; width: 26px; height: 26px;
+    text-align: center; line-height: 26px;
+    font-weight: bold; font-size: 12px;
+    border: 2px solid white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
   }
-  .legend-color {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
+  .hotel-marker {
+    background: #d81b60 !important;
   }
 
-  @media (max-width: 900px) {
-    .board { grid-template-columns: repeat(2, 1fr); }
+  /* 지도 크게 보기 모달 */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-content {
+    background: white;
+    border-radius: 15px;
+    width: 100%;
+    max-width: 1200px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 15px 20px;
+    background: linear-gradient(135deg, #1a237e, #3949ab);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h2 { font-size: 18px; }
+  .modal-close {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
+  }
+  .modal-close:hover { background: rgba(255,255,255,0.4); }
+  #big-map { flex: 1; width: 100%; }
+
+  @media (max-width: 1200px) {
+    .board { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 700px) {
+    .board { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -199,6 +246,7 @@
 </div>
 
 <div class="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#d81b60"></div>숙소</div>
   <div class="legend-item"><div class="legend-color" style="background:#f4511e"></div>먹거리</div>
   <div class="legend-item"><div class="legend-color" style="background:#1e88e5"></div>관광</div>
   <div class="legend-item"><div class="legend-color" style="background:#8e24aa"></div>쇼핑</div>
@@ -208,39 +256,45 @@
 </div>
 
 <div class="board" id="board">
+
   <!-- Day 1 -->
   <div class="day-column" data-day="1">
     <div class="day-header">
-      <div class="date">7/18 (토)</div>
-      <div class="day-name">Day 1 · 도착 & 긴자</div>
+      <div class="date" contenteditable="true">7/18 (토)</div>
+      <div class="day-name" contenteditable="true">Day 1 · 도착 & 긴자</div>
+      <div class="edit-hint">✏️ 날짜/제목 클릭해서 편집</div>
+    </div>
+    <div class="map-wrapper">
+      <div class="day-map" id="map-1"></div>
+      <button class="map-expand-btn" onclick="openBigMap(1)">🔍 크게 보기</button>
     </div>
     <div class="blocks-container">
-      <div class="block" draggable="true" data-cat="move">
+      <div class="block" draggable="true" data-cat="move" data-lat="35.5494" data-lng="139.7798">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">17:30</span>
-        <div class="block-title" contenteditable="true">✈️ 도쿄 공항 도착</div>
-        <div class="block-desc" contenteditable="true">숙소로 이동 (약 1~1.5시간)</div>
+        <div class="block-title" contenteditable="true">✈️ 하네다 공항 도착</div>
+        <div class="block-desc" contenteditable="true">숙소로 이동 (약 1시간)</div>
         <span class="block-cat">이동</span>
       </div>
-      <div class="block" draggable="true" data-cat="move">
+      <div class="block" draggable="true" data-cat="hotel" data-lat="35.6710" data-lng="139.7714">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">19:00</span>
         <div class="block-title" contenteditable="true">🏨 숙소 체크인</div>
         <div class="block-desc" contenteditable="true">HOTEL LiVEMAX Tokyo Shintomi-cho</div>
-        <span class="block-cat">이동</span>
+        <span class="block-cat">숙소</span>
       </div>
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6716" data-lng="139.7638">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">20:00</span>
         <div class="block-title" contenteditable="true">🍽️ 긴자바이린</div>
-        <div class="block-desc" contenteditable="true">원조 돈카츠 노포 (숙소 도보 10분)</div>
+        <div class="block-desc" contenteditable="true">원조 돈카츠 노포</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="sight">
+      <div class="block" draggable="true" data-cat="sight" data-lat="35.6586" data-lng="139.7454">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">21:30</span>
         <div class="block-title" contenteditable="true">🗼 도쿄타워 야경</div>
-        <div class="block-desc" contenteditable="true">지하철 20분, 첫날 기분내기</div>
+        <div class="block-desc" contenteditable="true">지하철 20분</div>
         <span class="block-cat">관광</span>
       </div>
     </div>
@@ -250,64 +304,76 @@
   <!-- Day 2 -->
   <div class="day-column" data-day="2">
     <div class="day-header">
-      <div class="date">7/19 (일)</div>
-      <div class="day-name">Day 2 · 시부야권</div>
+      <div class="date" contenteditable="true">7/19 (일)</div>
+      <div class="day-name" contenteditable="true">Day 2 · 시부야권</div>
+      <div class="edit-hint">✏️ 날짜/제목 클릭해서 편집</div>
+    </div>
+    <div class="map-wrapper">
+      <div class="day-map" id="map-2"></div>
+      <button class="map-expand-btn" onclick="openBigMap(2)">🔍 크게 보기</button>
     </div>
     <div class="blocks-container">
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="hotel" data-lat="35.6710" data-lng="139.7714">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">08:30</span>
+        <div class="block-title" contenteditable="true">🏨 숙소 출발</div>
+        <div class="block-desc" contenteditable="true">신토미초 → 니혼바시</div>
+        <span class="block-cat">숙소</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6836" data-lng="139.7731">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">09:00</span>
         <div class="block-title" contenteditable="true">🍣 츠지한 (니혼바시)</div>
-        <div class="block-desc" contenteditable="true">해선동 오픈런 · 숙소 도보 15분</div>
+        <div class="block-desc" contenteditable="true">해선동 오픈런</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="sight">
+      <div class="block" draggable="true" data-cat="sight" data-lat="35.6595" data-lng="139.7005">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">11:00</span>
         <div class="block-title" contenteditable="true">🌿 시부야 시부니와</div>
-        <div class="block-desc" contenteditable="true">시부야 옥상정원 산책</div>
+        <div class="block-desc" contenteditable="true">시부야 옥상정원</div>
         <span class="block-cat">관광</span>
       </div>
-      <div class="block" draggable="true" data-cat="shop">
+      <div class="block" draggable="true" data-cat="shop" data-lat="35.6595" data-lng="139.7038">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">12:30</span>
         <div class="block-title" contenteditable="true">🛍️ 시부야 히카리에</div>
         <div class="block-desc" contenteditable="true">쇼핑 & 구경</div>
         <span class="block-cat">쇼핑</span>
       </div>
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6580" data-lng="139.6990">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">13:30</span>
-        <div class="block-title" contenteditable="true">🥩 효탄야 6초메</div>
-        <div class="block-desc" contenteditable="true">점심 (야키니쿠)</div>
+        <div class="block-title" contenteditable="true">🍱 돈카츠 스즈키</div>
+        <div class="block-desc" contenteditable="true">시부야 도겐자카</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="sight">
+      <div class="block" draggable="true" data-cat="sight" data-lat="35.6613" data-lng="139.6683">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">15:00</span>
         <div class="block-title" contenteditable="true">☕ 시모키타자와</div>
-        <div class="block-desc" contenteditable="true">빈티지샵, 카페 골목 산책</div>
+        <div class="block-desc" contenteditable="true">빈티지샵 골목</div>
         <span class="block-cat">관광</span>
       </div>
-      <div class="block" draggable="true" data-cat="sight">
+      <div class="block" draggable="true" data-cat="sight" data-lat="35.6585" data-lng="139.7016">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">18:00</span>
         <div class="block-title" contenteditable="true">🌆 스크램블스퀘어 12F (무료)</div>
-        <div class="block-desc" contenteditable="true">무료 전망 플로어에서 일몰 감상</div>
+        <div class="block-desc" contenteditable="true">무료 전망 · 일몰</div>
         <span class="block-cat">관광</span>
       </div>
-      <div class="block" draggable="true" data-cat="sight">
+      <div class="block" draggable="true" data-cat="sight" data-lat="35.6585" data-lng="139.7016">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">19:30</span>
-        <div class="block-title" contenteditable="true">✨ 시부야 스카이 (유료·선택)</div>
-        <div class="block-desc" contenteditable="true">옥상 전망대 · 사전예약 필수</div>
+        <div class="block-title" contenteditable="true">✨ 시부야 스카이 (선택)</div>
+        <div class="block-desc" contenteditable="true">유료 옥상 전망</div>
         <span class="block-cat">관광</span>
       </div>
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6595" data-lng="139.7020">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">21:00</span>
         <div class="block-title" contenteditable="true">🥞 오코노미야키</div>
-        <div class="block-desc" contenteditable="true">시부야 일대 저녁</div>
+        <div class="block-desc" contenteditable="true">시부야 저녁</div>
         <span class="block-cat">먹거리</span>
       </div>
     </div>
@@ -317,36 +383,55 @@
   <!-- Day 3 -->
   <div class="day-column" data-day="3">
     <div class="day-header">
-      <div class="date">7/20 (월)</div>
-      <div class="day-name">Day 3 · 후지산</div>
+      <div class="date" contenteditable="true">7/20 (월)</div>
+      <div class="day-name" contenteditable="true">Day 3 · 후지산 & 신주쿠</div>
+      <div class="edit-hint">✏️ 날짜/제목 클릭해서 편집</div>
+    </div>
+    <div class="map-wrapper">
+      <div class="day-map" id="map-3"></div>
+      <button class="map-expand-btn" onclick="openBigMap(3)">🔍 크게 보기</button>
     </div>
     <div class="blocks-container">
-      <div class="block" draggable="true" data-cat="move">
+      <div class="block" draggable="true" data-cat="hotel" data-lat="35.6710" data-lng="139.7714">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">06:30</span>
+        <div class="block-title" contenteditable="true">🏨 숙소 출발</div>
+        <div class="block-desc" contenteditable="true">신주쿠 버스터미널로</div>
+        <span class="block-cat">숙소</span>
+      </div>
+      <div class="block" draggable="true" data-cat="move" data-lat="35.6910" data-lng="139.7005">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">07:30</span>
-        <div class="block-title" contenteditable="true">🚌 신주쿠 → 후지큐</div>
-        <div class="block-desc" contenteditable="true">바스타 신주쿠 고속버스 (약 1h40m)</div>
+        <div class="block-title" contenteditable="true">🚌 바스타 신주쿠 출발</div>
+        <div class="block-desc" contenteditable="true">고속버스 (약 1h40m)</div>
         <span class="block-cat">이동</span>
       </div>
-      <div class="block" draggable="true" data-cat="play">
+      <div class="block" draggable="true" data-cat="play" data-lat="35.4874" data-lng="138.7808">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">10:00</span>
         <div class="block-title" contenteditable="true">🎢 후지큐 하이랜드</div>
-        <div class="block-desc" contenteditable="true">에바 라이드, 후지야마 + 후지산 뷰</div>
+        <div class="block-desc" contenteditable="true">에바 라이드 + 후지산 뷰</div>
         <span class="block-cat">액티비티</span>
       </div>
-      <div class="block" draggable="true" data-cat="move">
+      <div class="block" draggable="true" data-cat="move" data-lat="35.6910" data-lng="139.7005">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">18:00</span>
-        <div class="block-title" contenteditable="true">🚌 후지큐 → 신주쿠</div>
+        <div class="block-title" contenteditable="true">🚌 신주쿠 복귀</div>
         <div class="block-desc" contenteditable="true">복귀 버스</div>
         <span class="block-cat">이동</span>
       </div>
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6929" data-lng="139.6994">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">20:00</span>
         <div class="block-title" contenteditable="true">🍢 오모이데요코초</div>
-        <div class="block-desc" contenteditable="true">신주쿠 꼬치구이 골목 · 레트로 감성</div>
+        <div class="block-desc" contenteditable="true">신주쿠 꼬치구이 골목</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6938" data-lng="139.7036">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">21:30</span>
+        <div class="block-title" contenteditable="true">☕ 킷사에루</div>
+        <div class="block-desc" contenteditable="true">체인소맨 성지 카페</div>
         <span class="block-cat">먹거리</span>
       </div>
     </div>
@@ -356,37 +441,42 @@
   <!-- Day 4 -->
   <div class="day-column" data-day="4">
     <div class="day-header">
-      <div class="date">7/21 (화)</div>
-      <div class="day-name">Day 4 · 디즈니씨</div>
+      <div class="date" contenteditable="true">7/21 (화)</div>
+      <div class="day-name" contenteditable="true">Day 4 · 디즈니씨</div>
+      <div class="edit-hint">✏️ 날짜/제목 클릭해서 편집</div>
+    </div>
+    <div class="map-wrapper">
+      <div class="day-map" id="map-4"></div>
+      <button class="map-expand-btn" onclick="openBigMap(4)">🔍 크게 보기</button>
     </div>
     <div class="blocks-container">
-      <div class="block" draggable="true" data-cat="move">
+      <div class="block" draggable="true" data-cat="hotel" data-lat="35.6710" data-lng="139.7714">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">07:30</span>
-        <div class="block-title" contenteditable="true">🚇 마이하마역 이동</div>
-        <div class="block-desc" contenteditable="true">유라쿠초선 → JR (약 30분)</div>
-        <span class="block-cat">이동</span>
+        <div class="block-title" contenteditable="true">🏨 숙소 출발</div>
+        <div class="block-desc" contenteditable="true">마이하마역까지 30분</div>
+        <span class="block-cat">숙소</span>
       </div>
-      <div class="block" draggable="true" data-cat="play">
+      <div class="block" draggable="true" data-cat="play" data-lat="35.6267" data-lng="139.8850">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">09:00</span>
         <div class="block-title" contenteditable="true">🏰 도쿄 디즈니씨</div>
-        <div class="block-desc" contenteditable="true">개장~폐장까지 풀타임<br>프리미어 액세스 앱 세팅</div>
+        <div class="block-desc" contenteditable="true">개장~폐장 풀타임</div>
         <span class="block-cat">액티비티</span>
       </div>
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6267" data-lng="139.8850">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">18:00</span>
         <div class="block-title" contenteditable="true">🍽️ 파크 내 저녁</div>
-        <div class="block-desc" contenteditable="true">불꽃/야경까지 관람</div>
+        <div class="block-desc" contenteditable="true">불꽃 관람</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="move">
+      <div class="block" draggable="true" data-cat="hotel" data-lat="35.6710" data-lng="139.7714">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">22:00</span>
         <div class="block-title" contenteditable="true">🏨 숙소 복귀</div>
         <div class="block-desc" contenteditable="true">휴식</div>
-        <span class="block-cat">이동</span>
+        <span class="block-cat">숙소</span>
       </div>
     </div>
     <button class="add-block-btn" onclick="addBlock(this)">+ 블록 추가</button>
@@ -395,46 +485,58 @@
   <!-- Day 5 -->
   <div class="day-column" data-day="5">
     <div class="day-header">
-      <div class="date">7/22 (수)</div>
-      <div class="day-name">Day 5 · 아키하바라</div>
+      <div class="date" contenteditable="true">7/22 (수)</div>
+      <div class="day-name" contenteditable="true">Day 5 · 아키하바라 & 긴자</div>
+      <div class="edit-hint">✏️ 날짜/제목 클릭해서 편집</div>
+    </div>
+    <div class="map-wrapper">
+      <div class="day-map" id="map-5"></div>
+      <button class="map-expand-btn" onclick="openBigMap(5)">🔍 크게 보기</button>
     </div>
     <div class="blocks-container">
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="hotel" data-lat="35.6710" data-lng="139.7714">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">08:30</span>
+        <div class="block-title" contenteditable="true">🏨 숙소 출발</div>
+        <div class="block-desc" contenteditable="true">긴자 하치고로 (도보 가능)</div>
+        <span class="block-cat">숙소</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6717" data-lng="139.7638">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">09:00</span>
         <div class="block-title" contenteditable="true">🍜 긴자 하치고</div>
         <div class="block-desc" contenteditable="true">미쉐린 라멘 오픈런</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="shop">
+      <div class="block" draggable="true" data-cat="shop" data-lat="35.7022" data-lng="139.7745">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">11:00</span>
         <div class="block-title" contenteditable="true">🎮 아키하바라</div>
-        <div class="block-desc" contenteditable="true">전자상가, 애니메이션, 굿즈샵</div>
+        <div class="block-desc" contenteditable="true">전자상가 & 굿즈샵</div>
         <span class="block-cat">쇼핑</span>
       </div>
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="food" data-lat="35.7022" data-lng="139.7745">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">14:00</span>
-        <div class="block-title" contenteditable="true">☕ 킷사에루</div>
-        <div class="block-desc" contenteditable="true">체인소맨 성지순례 카페</div>
+        <div class="block-title" contenteditable="true">🍱 아키하바라 자유 점심</div>
+        <div class="block-desc" contenteditable="true">현지 라멘/카레</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="sight">
+      <div class="block" draggable="true" data-cat="sight" data-lat="35.6631" data-lng="139.7415">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">16:00</span>
         <div class="block-title" contenteditable="true">🏙️ 아자부다이힐스</div>
-        <div class="block-desc" contenteditable="true">카페 타임 & 모리 JP 타워</div>
+        <div class="block-desc" contenteditable="true">카페 & 모리 JP 타워</div>
         <span class="block-cat">관광</span>
       </div>
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6702" data-lng="139.7648">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">19:00</span>
-        <div class="block-title" contenteditable="true">🍣 긴자스시 마루이</div>
-        <div class="block-desc" contenteditable="true">저녁 (or 돈카츠 스즈키)</div>
+        <div class="block-title" contenteditable="true">🥩 효탄야 6초메</div>
+        <div class="block-desc" contenteditable="true">긴자 야키니쿠</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="shop">
+      <div class="block" draggable="true" data-cat="shop" data-lat="35.6717" data-lng="139.7649">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">21:00</span>
         <div class="block-title" contenteditable="true">🛍️ 긴자 산책</div>
@@ -448,39 +550,51 @@
   <!-- Day 6 -->
   <div class="day-column" data-day="6">
     <div class="day-header">
-      <div class="date">7/23 (목)</div>
-      <div class="day-name">Day 6 · 귀국</div>
+      <div class="date" contenteditable="true">7/23 (목)</div>
+      <div class="day-name" contenteditable="true">Day 6 · 귀국</div>
+      <div class="edit-hint">✏️ 날짜/제목 클릭해서 편집</div>
+    </div>
+    <div class="map-wrapper">
+      <div class="day-map" id="map-6"></div>
+      <button class="map-expand-btn" onclick="openBigMap(6)">🔍 크게 보기</button>
     </div>
     <div class="blocks-container">
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="hotel" data-lat="35.6710" data-lng="139.7714">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">07:30</span>
+        <div class="block-title" contenteditable="true">🏨 숙소 출발</div>
+        <div class="block-desc" contenteditable="true">츠키지 시장으로 (도보 10분)</div>
+        <span class="block-cat">숙소</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6654" data-lng="139.7707">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">08:00</span>
         <div class="block-title" contenteditable="true">🐟 츠키지 시장</div>
-        <div class="block-desc" contenteditable="true">숙소 도보 10분 · 스시/해선동</div>
+        <div class="block-desc" contenteditable="true">스시/해선동</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="shop">
+      <div class="block" draggable="true" data-cat="shop" data-lat="35.6717" data-lng="139.7649">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">10:30</span>
         <div class="block-title" contenteditable="true">🛍️ 긴자 마지막 쇼핑</div>
-        <div class="block-desc" contenteditable="true">돈키호테, 유니클로, 무인양품</div>
+        <div class="block-desc" contenteditable="true">돈키호테, 무인양품</div>
         <span class="block-cat">쇼핑</span>
       </div>
-      <div class="block" draggable="true" data-cat="food">
+      <div class="block" draggable="true" data-cat="food" data-lat="35.6720" data-lng="139.7660">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">12:30</span>
-        <div class="block-title" contenteditable="true">🍱 마지막 점심</div>
-        <div class="block-desc" contenteditable="true">돈카츠 스즈키 or 레어 텐동 미츠요시</div>
+        <div class="block-title" contenteditable="true">🍤 레어 텐동 긴자 미츠요시</div>
+        <div class="block-desc" contenteditable="true">마지막 점심</div>
         <span class="block-cat">먹거리</span>
       </div>
-      <div class="block" draggable="true" data-cat="move">
+      <div class="block" draggable="true" data-cat="hotel" data-lat="35.6710" data-lng="139.7714">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
-        <span class="block-time" contenteditable="true">15:00</span>
-        <div class="block-title" contenteditable="true">🚅 공항 이동</div>
-        <div class="block-desc" contenteditable="true">체크아웃 & 공항으로</div>
-        <span class="block-cat">이동</span>
+        <span class="block-time" contenteditable="true">14:30</span>
+        <div class="block-title" contenteditable="true">🏨 숙소 체크아웃</div>
+        <div class="block-desc" contenteditable="true">짐 챙기고 공항으로</div>
+        <span class="block-cat">숙소</span>
       </div>
-      <div class="block" draggable="true" data-cat="move">
+      <div class="block" draggable="true" data-cat="move" data-lat="35.5494" data-lng="139.7798">
         <button class="delete-btn" onclick="deleteBlock(this)">×</button>
         <span class="block-time" contenteditable="true">18:00</span>
         <div class="block-title" contenteditable="true">✈️ 도쿄 출발</div>
@@ -490,47 +604,195 @@
     </div>
     <button class="add-block-btn" onclick="addBlock(this)">+ 블록 추가</button>
   </div>
+
+</div>
+
+<!-- 지도 크게 보기 모달 -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeBigMap(event)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">🗺️ 지도 크게 보기</h2>
+      <button class="modal-close" onclick="closeBigMap()">×</button>
+    </div>
+    <div id="big-map"></div>
+  </div>
 </div>
 
 <script>
   let draggedItem = null;
+  const catNames = { empty:'빈 블록', food:'먹거리', sight:'관광', shop:'쇼핑', play:'액티비티', move:'이동', hotel:'숙소' };
+  const dayMaps = {};
+  const dayLayers = {};
+  let bigMap = null;
+  let bigMapLayer = null;
+
+  function initMaps() {
+    document.querySelectorAll('.day-column').forEach(col => {
+      const day = col.getAttribute('data-day');
+      const mapEl = col.querySelector('.day-map');
+      const map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: false }).setView([35.68, 139.75], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OSM',
+        maxZoom: 18
+      }).addTo(map);
+      dayMaps[day] = map;
+      dayLayers[day] = L.layerGroup().addTo(map);
+      updateMap(day);
+    });
+  }
+
+  function drawMapContent(day, targetMap, targetLayer) {
+    targetLayer.clearLayers();
+    const col = document.querySelector(`.day-column[data-day="${day}"]`);
+    const blocks = col.querySelectorAll('.block');
+    const points = [];
+
+    blocks.forEach((b) => {
+      const lat = parseFloat(b.getAttribute('data-lat'));
+      const lng = parseFloat(b.getAttribute('data-lng'));
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      const title = b.querySelector('.block-title').innerText;
+      const time = b.querySelector('.block-time').innerText;
+      const cat = b.getAttribute('data-cat');
+      const num = points.length + 1;
+      const isHotel = cat === 'hotel';
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="custom-marker ${isHotel ? 'hotel-marker' : ''}">${isHotel ? '🏨' : num}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+
+      const marker = L.marker([lat, lng], { icon: icon })
+        .bindPopup(`<b>${time}</b><br>${title}`);
+      marker.on('click', () => {
+        document.querySelectorAll('.block.highlighted').forEach(el => el.classList.remove('highlighted'));
+        b.classList.add('highlighted');
+        b.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+      targetLayer.addLayer(marker);
+      points.push([lat, lng]);
+    });
+
+    if (points.length >= 2) {
+      const line = L.polyline(points, {
+        color: '#ff4081',
+        weight: 3,
+        opacity: 0.7,
+        dashArray: '6, 8'
+      });
+      targetLayer.addLayer(line);
+    }
+
+    if (points.length > 0) {
+      const bounds = L.latLngBounds(points);
+      targetMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+    }
+  }
+
+  function updateMap(day) {
+    const map = dayMaps[day];
+    const layer = dayLayers[day];
+
+    // 마커 번호 배지 업데이트
+    const col = document.querySelector(`.day-column[data-day="${day}"]`);
+    const blocks = col.querySelectorAll('.block');
+    let numCounter = 0;
+
+    blocks.forEach((b) => {
+      const lat = parseFloat(b.getAttribute('data-lat'));
+      const lng = parseFloat(b.getAttribute('data-lng'));
+      const cat = b.getAttribute('data-cat');
+
+      let badge = b.querySelector('.marker-num');
+      if (!isNaN(lat) && !isNaN(lng)) {
+        numCounter++;
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'marker-num';
+          b.querySelector('.block-time').before(badge);
+        }
+        badge.textContent = cat === 'hotel' ? '🏨' : numCounter;
+        badge.style.background = cat === 'hotel' ? '#d81b60' : '#1a237e';
+        badge.style.width = cat === 'hotel' ? 'auto' : '18px';
+        badge.style.padding = cat === 'hotel' ? '0 4px' : '0';
+      } else {
+        if (badge) badge.remove();
+      }
+
+      // 클릭 핸들러
+      b.onclick = (e) => {
+        if (e.target.hasAttribute('contenteditable')) return;
+        if (e.target.classList.contains('delete-btn')) return;
+        if (!isNaN(lat) && !isNaN(lng)) {
+          map.setView([lat, lng], 15);
+        }
+      };
+    });
+
+    drawMapContent(day, map, layer);
+  }
+
+  function updateAllMaps() {
+    Object.keys(dayMaps).forEach(day => updateMap(day));
+  }
+
+  function openBigMap(day) {
+    const col = document.querySelector(`.day-column[data-day="${day}"]`);
+    const dayName = col.querySelector('.day-name').innerText;
+    const dateName = col.querySelector('.date').innerText;
+    document.getElementById('modal-title').innerText = `🗺️ ${dateName} · ${dayName}`;
+    document.getElementById('modal-overlay').classList.add('active');
+
+    setTimeout(() => {
+      if (!bigMap) {
+        bigMap = L.map('big-map', { scrollWheelZoom: true }).setView([35.68, 139.75], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OSM', maxZoom: 18
+        }).addTo(bigMap);
+        bigMapLayer = L.layerGroup().addTo(bigMap);
+      } else {
+        bigMap.invalidateSize();
+      }
+      drawMapContent(day, bigMap, bigMapLayer);
+    }, 100);
+  }
+
+  function closeBigMap(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('modal-overlay').classList.remove('active');
+  }
 
   function initDragAndDrop() {
-    document.querySelectorAll('.block').forEach(block => {
-      attachBlockListeners(block);
-    });
+    document.querySelectorAll('.block').forEach(block => attachBlockListeners(block));
     document.querySelectorAll('.blocks-container').forEach(container => {
       container.addEventListener('dragover', e => {
         e.preventDefault();
         const afterElement = getDragAfterElement(container, e.clientY);
         if (draggedItem) {
-          if (afterElement == null) {
-            container.appendChild(draggedItem);
-          } else {
-            container.insertBefore(draggedItem, afterElement);
-          }
+          if (afterElement == null) container.appendChild(draggedItem);
+          else container.insertBefore(draggedItem, afterElement);
         }
       });
+      container.addEventListener('drop', () => updateAllMaps());
     });
   }
 
   function attachBlockListeners(block) {
-    block.addEventListener('dragstart', e => {
+    block.addEventListener('dragstart', () => {
       draggedItem = block;
       setTimeout(() => block.classList.add('dragging'), 0);
     });
-    block.addEventListener('dragend', e => {
+    block.addEventListener('dragend', () => {
       block.classList.remove('dragging');
       draggedItem = null;
+      updateAllMaps();
     });
-    // 편집 가능 영역 클릭 시 드래그 방지
     block.querySelectorAll('[contenteditable]').forEach(el => {
-      el.addEventListener('mousedown', e => {
-        block.setAttribute('draggable', 'false');
-      });
-      el.addEventListener('blur', e => {
-        block.setAttribute('draggable', 'true');
-      });
+      el.addEventListener('mousedown', () => block.setAttribute('draggable', 'false'));
+      el.addEventListener('blur', () => block.setAttribute('draggable', 'true'));
     });
   }
 
@@ -539,18 +801,13 @@
     return draggableElements.reduce((closest, child) => {
       const box = child.getBoundingClientRect();
       const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) {
-        return { offset: offset, element: child };
-      } else {
-        return closest;
-      }
+      if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+      return closest;
     }, { offset: Number.NEGATIVE_INFINITY }).element;
   }
 
   function addBlock(btn) {
     const container = btn.previousElementSibling;
-    const categories = ['empty', 'food', 'sight', 'shop', 'play', 'move'];
-    const catNames = { empty:'빈 블록', food:'먹거리', sight:'관광', shop:'쇼핑', play:'액티비티', move:'이동' };
     const cat = 'empty';
     const block = document.createElement('div');
     block.className = 'block';
@@ -560,27 +817,45 @@
       <button class="delete-btn" onclick="deleteBlock(this)">×</button>
       <span class="block-time" contenteditable="true">00:00</span>
       <div class="block-title" contenteditable="true">새 일정</div>
-      <div class="block-desc" contenteditable="true">클릭해서 내용 입력 · 카테고리 변경은 아래 클릭</div>
+      <div class="block-desc" contenteditable="true">위치는 아래 버튼으로 설정</div>
       <span class="block-cat" onclick="changeCat(this)" style="cursor:pointer">${catNames[cat]} (클릭하여 변경)</span>
+      <button style="margin-top:6px;width:100%;padding:4px;font-size:10px;border:1px solid #1a237e;background:white;color:#1a237e;border-radius:5px;cursor:pointer" onclick="setLocation(this)">📍 위치 설정</button>
     `;
     container.appendChild(block);
     attachBlockListeners(block);
+    updateAllMaps();
+  }
+
+  function setLocation(btn) {
+    const block = btn.closest('.block');
+    const input = prompt('좌표를 입력하세요 (형식: 위도,경도)\n예: 35.6595,139.7005\n\n구글맵에서 장소 우클릭 → 좌표 복사',
+      block.getAttribute('data-lat') ? `${block.getAttribute('data-lat')},${block.getAttribute('data-lng')}` : '');
+    if (!input) return;
+    const parts = input.split(',').map(s => s.trim());
+    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+      alert('올바른 형식이 아닙니다.');
+      return;
+    }
+    block.setAttribute('data-lat', parts[0]);
+    block.setAttribute('data-lng', parts[1]);
+    updateAllMaps();
   }
 
   function changeCat(el) {
     const block = el.closest('.block');
-    const cats = ['empty', 'food', 'sight', 'shop', 'play', 'move'];
-    const catNames = { empty:'빈 블록', food:'먹거리', sight:'관광', shop:'쇼핑', play:'액티비티', move:'이동' };
+    const cats = ['empty', 'food', 'sight', 'shop', 'play', 'move', 'hotel'];
     const currentCat = block.getAttribute('data-cat');
     const nextIdx = (cats.indexOf(currentCat) + 1) % cats.length;
     const nextCat = cats[nextIdx];
     block.setAttribute('data-cat', nextCat);
     el.textContent = catNames[nextCat] + ' (클릭하여 변경)';
+    updateAllMaps();
   }
 
   function deleteBlock(btn) {
     if (confirm('이 블록을 삭제할까요?')) {
       btn.closest('.block').remove();
+      updateAllMaps();
     }
   }
 
@@ -592,12 +867,18 @@
       col.querySelectorAll('.block').forEach(b => {
         blocks.push({
           cat: b.getAttribute('data-cat'),
+          lat: b.getAttribute('data-lat'),
+          lng: b.getAttribute('data-lng'),
           time: b.querySelector('.block-time').innerText,
           title: b.querySelector('.block-title').innerText,
-          desc: b.querySelector('.block-desc').innerText
+          desc: b.querySelector('.block-desc').innerHTML
         });
       });
-      data[day] = blocks;
+      data[day] = {
+        date: col.querySelector('.date').innerText,
+        dayName: col.querySelector('.day-name').innerText,
+        blocks: blocks
+      };
     });
     localStorage.setItem('tokyoPlan', JSON.stringify(data));
     alert('✅ 계획이 저장되었습니다!');
@@ -607,37 +888,47 @@
     const saved = localStorage.getItem('tokyoPlan');
     if (!saved) { alert('저장된 계획이 없습니다.'); return; }
     const data = JSON.parse(saved);
-    const catNames = { empty:'빈 블록', food:'먹거리', sight:'관광', shop:'쇼핑', play:'액티비티', move:'이동' };
     document.querySelectorAll('.day-column').forEach(col => {
       const day = col.getAttribute('data-day');
+      const dayData = data[day];
+      if (!dayData) return;
+      const blocks = Array.isArray(dayData) ? dayData : dayData.blocks;
+      if (dayData.date) col.querySelector('.date').innerText = dayData.date;
+      if (dayData.dayName) col.querySelector('.day-name').innerText = dayData.dayName;
+
       const container = col.querySelector('.blocks-container');
       container.innerHTML = '';
-      (data[day] || []).forEach(item => {
+      blocks.forEach(item => {
         const block = document.createElement('div');
         block.className = 'block';
         block.setAttribute('draggable', 'true');
         block.setAttribute('data-cat', item.cat);
+        if (item.lat) block.setAttribute('data-lat', item.lat);
+        if (item.lng) block.setAttribute('data-lng', item.lng);
         block.innerHTML = `
           <button class="delete-btn" onclick="deleteBlock(this)">×</button>
           <span class="block-time" contenteditable="true">${item.time}</span>
           <div class="block-title" contenteditable="true">${item.title}</div>
           <div class="block-desc" contenteditable="true">${item.desc}</div>
           <span class="block-cat" onclick="changeCat(this)" style="cursor:pointer">${catNames[item.cat]}</span>
+          <button style="margin-top:6px;width:100%;padding:4px;font-size:10px;border:1px solid #1a237e;background:white;color:#1a237e;border-radius:5px;cursor:pointer" onclick="setLocation(this)">📍 위치 설정</button>
         `;
         container.appendChild(block);
         attachBlockListeners(block);
       });
     });
+    updateAllMaps();
     alert('📂 불러오기 완료!');
   }
 
   function resetPlan() {
-    if (confirm('정말 초기 상태로 되돌릴까요? (저장된 데이터는 유지됩니다)')) {
-      location.reload();
-    }
+    if (confirm('정말 초기 상태로 되돌릴까요?')) location.reload();
   }
 
-  initDragAndDrop();
+  window.addEventListener('load', () => {
+    initMaps();
+    initDragAndDrop();
+  });
 </script>
 
 </body>
