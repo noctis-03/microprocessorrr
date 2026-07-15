@@ -2,226 +2,643 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>도쿄 숙소 비교 (2026-07-18 체크인, 5박)</title>
+<title>도쿄 여행 계획표</title>
 <style>
-  body { font-family: 'Malgun Gothic', -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f6f8; margin: 0; padding: 24px; color: #222; }
-  h1 { text-align: center; margin-bottom: 8px; }
-  .sub { text-align: center; color: #666; margin-bottom: 28px; font-size: 14px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; }
-  .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.08); overflow: hidden; display: flex; flex-direction: column; }
-  .card img { width: 100%; height: 220px; object-fit: cover; background:#ddd; }
-  .body { padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column; }
-  .name { font-size: 17px; font-weight: 700; margin: 0 0 6px; }
-  .stars { color: #f5a623; font-size: 13px; margin-bottom: 6px; }
-  .meta { font-size: 13px; color: #555; margin-bottom: 10px; line-height: 1.5; }
-  .score { display:inline-block; background:#0071c2; color:#fff; padding:2px 8px; border-radius:6px; font-size:12px; font-weight:600; margin-right:6px; }
-  .price { color:#c0392b; font-weight:700; font-size:14px; margin: 6px 0 10px; }
-  .amenities { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-  .tag { font-size: 11px; background:#eef4fb; color:#0071c2; padding: 4px 8px; border-radius: 12px; border:1px solid #d5e6f5; }
-  .tag.no { background:#fbecec; color:#c0392b; border-color:#f2c8c8; text-decoration: line-through; opacity:.7; }
-  .tag.maybe { background:#fff7e0; color:#a37700; border-color:#f0dfa1; }
-  .btn { display:inline-block; margin-top:auto; text-align:center; background:#0071c2; color:#fff; text-decoration:none; padding:10px 12px; border-radius:8px; font-weight:600; font-size:13px; }
-  .btn:hover { background:#005a9e; }
-  .legend { max-width:1400px; margin: 20px auto 0; font-size: 12px; color:#666; background:#fff; padding:12px 16px; border-radius:8px; }
-  .legend .tag { margin-right:8px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    background: linear-gradient(135deg, #fce4ec 0%, #e1f5fe 100%);
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    color: #1a237e;
+    margin-bottom: 10px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #555;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  .toolbar {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 25px;
+    background: #1a237e;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.2s;
+  }
+  .btn:hover { background: #3949ab; transform: translateY(-2px); }
+  .btn.save { background: #43a047; }
+  .btn.load { background: #fb8c00; }
+  .btn.reset { background: #e53935; }
+  .btn.add { background: #8e24aa; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .day-column {
+    background: rgba(255,255,255,0.7);
+    border-radius: 15px;
+    padding: 12px;
+    min-height: 600px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+  }
+  .day-header {
+    text-align: center;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #1a237e, #3949ab);
+    color: white;
+    border-radius: 10px;
+    font-weight: bold;
+  }
+  .day-header .date { font-size: 16px; }
+  .day-header .day-name { font-size: 12px; opacity: 0.9; margin-top: 3px; }
+
+  .block {
+    background: white;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 8px;
+    cursor: grab;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    border-left: 4px solid #3949ab;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .block:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(-1px); }
+  .block:active { cursor: grabbing; }
+  .block.dragging { opacity: 0.4; }
+  .block.drag-over { border-top: 3px solid #ff4081; }
+
+  /* 카테고리별 색상 */
+  .block[data-cat="food"] { border-left-color: #f4511e; background: #fff3e0; }
+  .block[data-cat="sight"] { border-left-color: #1e88e5; background: #e3f2fd; }
+  .block[data-cat="shop"] { border-left-color: #8e24aa; background: #f3e5f5; }
+  .block[data-cat="play"] { border-left-color: #43a047; background: #e8f5e9; }
+  .block[data-cat="move"] { border-left-color: #757575; background: #eeeeee; }
+  .block[data-cat="empty"] { border-left-color: #bdbdbd; background: #fafafa; border-style: dashed; border: 2px dashed #bdbdbd; }
+
+  .block-time {
+    font-size: 11px;
+    font-weight: bold;
+    color: #1a237e;
+    padding: 2px 6px;
+    background: rgba(26,35,126,0.1);
+    border-radius: 4px;
+    display: inline-block;
+    cursor: text;
+  }
+  .block-title {
+    font-size: 13px;
+    font-weight: bold;
+    margin: 5px 0 3px 0;
+    color: #212121;
+    cursor: text;
+    word-break: keep-all;
+  }
+  .block-desc {
+    font-size: 11px;
+    color: #555;
+    cursor: text;
+    line-height: 1.4;
+    word-break: keep-all;
+  }
+  .block-cat {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.05);
+    margin-top: 4px;
+  }
+  .delete-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 50%;
+    background: #e53935;
+    color: white;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    line-height: 1;
+  }
+  .block:hover .delete-btn { opacity: 1; }
+
+  .add-block-btn {
+    width: 100%;
+    padding: 8px;
+    border: 2px dashed #9e9e9e;
+    background: transparent;
+    border-radius: 10px;
+    color: #757575;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 5px;
+    transition: all 0.2s;
+  }
+  .add-block-btn:hover { border-color: #1a237e; color: #1a237e; background: rgba(26,35,126,0.05); }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 15px 0;
+    flex-wrap: wrap;
+    font-size: 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+
+  @media (max-width: 900px) {
+    .board { grid-template-columns: repeat(2, 1fr); }
+  }
 </style>
 </head>
 <body>
 
-<h1>도쿄 숙소 비교</h1>
-<div class="sub">체크인 2026-07-18 · 5박 · 성인 2인 · Agoda 기준</div>
+<h1>🗼 도쿄 여행 계획표</h1>
+<div class="subtitle">7/18(토) ~ 7/23(목) · 5박 6일 · 숙소: HOTEL LiVEMAX Tokyo Shintomi-cho</div>
 
-<div class="grid">
-
-  <!-- 1. APA Ginza Shintomicho Ekimae Kita -->
-  <div class="card">
-    <img src="https://pix8.agoda.net/hotelImages/16211744/-1/8b0f47c8f0c8b4a3e1d5f7c0e5a1b9c2.jpg" alt="APA 호텔 긴자 신토미초 에키마에 키타" onerror="this.src='https://via.placeholder.com/400x220?text=APA+Shintomicho+Ekimae+Kita'">
-    <div class="body">
-      <div class="name">APA 호텔 긴자 신토미초 에키마에 키타</div>
-      <div class="stars">★★★☆ (3.5성)</div>
-      <div class="meta">
-        <span class="score">8.6</span> 청결 9.0 / 스태프 8.9<br>
-        위치: 츄오구 신토미초, 긴자 도보권<br>
-        객실: 11~22㎡ · 98실 · 2016년 건축<br>
-        체크인 15:00 / 체크아웃 10:00
-      </div>
-      <div class="price">평균 약 $92/박</div>
-      <div class="amenities">
-        <span class="tag">✓ 셀프 세탁실(코인런드리)</span>
-        <span class="tag">✓ 세탁 서비스</span>
-        <span class="tag">✓ 드라이클리닝</span>
-        <span class="tag">✓ 무료 Wi-Fi</span>
-        <span class="tag">✓ 조식 뷔페</span>
-        <span class="tag">✓ 마사지</span>
-        <span class="tag">✓ 자판기</span>
-        <span class="tag">✓ 수하물보관</span>
-        <span class="tag">✓ 금고</span>
-        <span class="tag maybe">△ 전자레인지 (공용 가능)</span>
-      </div>
-      <a class="btn" href="https://www.agoda.com/ko-kr/apa-hotel-shintomicho-ekikita_2/hotel/tokyo-jp.html?checkIn=2026-07-18&los=5&adults=2" target="_blank">아고다 예약 링크</a>
-    </div>
-  </div>
-
-  <!-- 2. APA Hatchobori Shintomicho -->
-  <div class="card">
-    <img src="https://pix8.agoda.net/hotelImages/23755024/-1/apahatchobori.jpg" alt="APA 호텔 하초보리 신토미초" onerror="this.src='https://via.placeholder.com/400x220?text=APA+Hatchobori+Shintomicho'">
-    <div class="body">
-      <div class="name">APA 호텔 하초보리 신토미초</div>
-      <div class="stars">★★★☆ (3.5성)</div>
-      <div class="meta">
-        <span class="score">8.4</span> 청결 8.7 / 스태프 8.7<br>
-        위치: 츄오구, 핫초보리·신토미초역 인근<br>
-        객실: 약 11㎡ · 141실 · 2018년 건축<br>
-        체크인 15:00 / 체크아웃 10:00
-      </div>
-      <div class="price">평균 약 $88/박</div>
-      <div class="amenities">
-        <span class="tag">✓ 세탁 서비스/드라이클리닝</span>
-        <span class="tag">✓ 무료 Wi-Fi</span>
-        <span class="tag">✓ 조식(일식/양식)</span>
-        <span class="tag">✓ 마사지</span>
-        <span class="tag">✓ 객실 냉장고</span>
-        <span class="tag">✓ 자동 체크인 기계</span>
-        <span class="tag">✓ 자판기</span>
-        <span class="tag">✓ 수하물보관</span>
-        <span class="tag">✓ 금고</span>
-        <span class="tag maybe">△ 전자레인지 (공용)</span>
-      </div>
-      <a class="btn" href="https://www.agoda.com/ko-kr/apa-hotel-hatchobori-shintomicho/hotel/tokyo-jp.html?checkIn=2026-07-18&los=5&adults=2" target="_blank">아고다 예약 링크</a>
-    </div>
-  </div>
-
-  <!-- 3. ICI Hotel Tokyo Hatchobori -->
-  <div class="card">
-    <img src="https://pix8.agoda.net/hotelImages/26886051/-1/icihotelhatchobori.jpg" alt="ICI Hotel Tokyo Hatchobori" onerror="this.src='https://via.placeholder.com/400x220?text=ICI+Hotel+Hatchobori'">
-    <div class="body">
-      <div class="name">ICI HOTEL Tokyo Hatchobori by Relief</div>
-      <div class="stars">★★★ (3성)</div>
-      <div class="meta">
-        <span class="score">8.5</span> 청결 8.7 / 위치 8.7<br>
-        위치: 츄오구 하초보리, 지하철역 도보 1~3분<br>
-        객실: 11~17㎡ · 102실 · 2020년 오픈(신축)<br>
-        체크인 15:00 / 체크아웃 10:00
-      </div>
-      <div class="price">평균 약 $86/박</div>
-      <div class="amenities">
-        <span class="tag">✓ 셀프 세탁실</span>
-        <span class="tag">✓ 무료 Wi-Fi</span>
-        <span class="tag">✓ 조식 뷔페(플라자)</span>
-        <span class="tag">✓ 스카이바</span>
-        <span class="tag">✓ 객실 냉장고/주전자</span>
-        <span class="tag">✓ 24시간 프런트</span>
-        <span class="tag">✓ 수하물보관</span>
-        <span class="tag">✓ 금고</span>
-        <span class="tag">✓ 공기청정기</span>
-        <span class="tag maybe">△ 전자레인지 (공용)</span>
-      </div>
-      <a class="btn" href="https://www.agoda.com/ko-kr/ici-hotel-tokyo-hatchobori-by-relief/hotel/tokyo-jp.html?checkIn=2026-07-18&los=5&adults=2" target="_blank">아고다 예약 링크</a>
-    </div>
-  </div>
-
-  <!-- 4. Sakura Hotel Nippori -->
-  <div class="card">
-    <img src="https://pix8.agoda.net/hotelImages/20259234/-1/sakuranippori.jpg" alt="사쿠라 호텔 닛포리" onerror="this.src='https://via.placeholder.com/400x220?text=Sakura+Hotel+Nippori'">
-    <div class="body">
-      <div class="name">사쿠라 호텔 닛포리 (Sakura Hotel Nippori)</div>
-      <div class="stars">★★ (2성)</div>
-      <div class="meta">
-        <span class="score">8.6</span> 스태프 9.1 (강점!)<br>
-        위치: 우에노/야나카, 닛포리 인근<br>
-        객실: 14㎡~ · 93실 · 일본식/서양식 다양<br>
-        체크아웃 11:00 · 공용 욕실 객실도 있음
-      </div>
-      <div class="price">평균 약 $83/박</div>
-      <div class="amenities">
-        <span class="tag">✓ 코인 세탁기</span>
-        <span class="tag">✓ 세탁 서비스</span>
-        <span class="tag">✓ 전자레인지 (공용)</span>
-        <span class="tag">✓ 공용 주방/온수</span>
-        <span class="tag">✓ 24시간 카페</span>
-        <span class="tag">✓ 무료 Wi-Fi</span>
-        <span class="tag">✓ 조식 뷔페</span>
-        <span class="tag">✓ 다국어 리셉션</span>
-        <span class="tag">✓ 수하물배송</span>
-        <span class="tag">✓ 환전기</span>
-      </div>
-      <a class="btn" href="https://www.agoda.com/ko-kr/sakura-hotel-nippori/hotel/tokyo-jp.html?checkIn=2026-07-18&los=5&adults=2" target="_blank">아고다 예약 링크</a>
-    </div>
-  </div>
-
-  <!-- 5. Hotel Livemax Ueno-ekimae -->
-  <div class="card">
-    <img src="https://pix8.agoda.net/hotelImages/23216080/-1/livemaxueno.jpg" alt="호텔 라이브맥스 우에노역앞" onerror="this.src='https://via.placeholder.com/400x220?text=Livemax+Ueno-ekimae'">
-    <div class="body">
-      <div class="name">호텔 라이브맥스 우에노 에키마에</div>
-      <div class="stars">★★ (2성)</div>
-      <div class="meta">
-        <span class="score">7.0대</span> 위치 7.7 / 스태프 7.6<br>
-        위치: 우에노역 도보 약 5분<br>
-        객실: 9~11㎡ · 81실 · 2018년 오픈<br>
-        체크인 15:00 / 체크아웃 10:00
-      </div>
-      <div class="price">평균 약 $88/박</div>
-      <div class="amenities">
-        <span class="tag">✓ 객실 내 전자레인지</span>
-        <span class="tag">✓ 객실 냉장고</span>
-        <span class="tag">✓ 셀프 세탁실</span>
-        <span class="tag">✓ 세탁 서비스</span>
-        <span class="tag">✓ 무료 Wi-Fi</span>
-        <span class="tag">✓ 자판기</span>
-        <span class="tag">✓ 수하물보관</span>
-        <span class="tag">✓ 주차장(유료)</span>
-        <span class="tag no">✗ 조식 (없음)</span>
-      </div>
-      <a class="btn" href="https://www.agoda.com/ko-kr/hotel-livemax-ueno-ekimae/hotel/tokyo-jp.html?checkIn=2026-07-18&los=5&adults=2" target="_blank">아고다 예약 링크</a>
-    </div>
-  </div>
-
-  <!-- 6. Hotel Livemax Tokyo Shintomicho -->
-  <div class="card">
-    <img src="https://pix8.agoda.net/hotelImages/25489612/-1/livemaxshintomicho.jpg" alt="호텔 라이브맥스 도쿄 신토미초" onerror="this.src='https://via.placeholder.com/400x220?text=Livemax+Shintomicho'">
-    <div class="body">
-      <div class="name">호텔 라이브맥스 도쿄 신토미초</div>
-      <div class="stars">★★ (2성)</div>
-      <div class="meta">
-        <span class="score">7.0</span> 가치 7.2 / 위치 7.1<br>
-        위치: 츄오구 신토미초, 긴자 도보권<br>
-        객실: 13㎡ · 69실<br>
-        체크인 15:00 / 체크아웃 10:00
-      </div>
-      <div class="price">평균 약 $83/박</div>
-      <div class="amenities">
-        <span class="tag">✓ 객실 내 전자레인지</span>
-        <span class="tag">✓ 객실 냉장고</span>
-        <span class="tag">✓ 전기포트</span>
-        <span class="tag">✓ 가습기/공기청정기</span>
-        <span class="tag">✓ 대형 TV</span>
-        <span class="tag">✓ 셀프 세탁실</span>
-        <span class="tag">✓ 세탁 서비스</span>
-        <span class="tag">✓ 무료 Wi-Fi</span>
-        <span class="tag">✓ 마사지</span>
-        <span class="tag">✓ 피트니스 센터</span>
-        <span class="tag no">✗ 조식 (없음)</span>
-      </div>
-      <a class="btn" href="https://www.agoda.com/ko-kr/hotel-livemax-tokyo-shintomicho/hotel/tokyo-jp.html?checkIn=2026-07-18&los=5&adults=2" target="_blank">아고다 예약 링크</a>
-    </div>
-  </div>
-
+<div class="toolbar">
+  <button class="btn save" onclick="savePlan()">💾 저장</button>
+  <button class="btn load" onclick="loadPlan()">📂 불러오기</button>
+  <button class="btn reset" onclick="resetPlan()">🔄 초기화</button>
+  <button class="btn" onclick="window.print()">🖨️ 인쇄</button>
 </div>
 
 <div class="legend">
-  <b>편의시설 표시</b> &nbsp;
-  <span class="tag">✓ 제공</span>
-  <span class="tag maybe">△ 공용/불명확</span>
-  <span class="tag no">✗ 없음</span>
-  <br><br>
-  <b>추천 요약</b><br>
-  • <b>객실 내 전자레인지가 확실히 있는 곳</b>: 라이브맥스 우에노, 라이브맥스 신토미초 (장기 체류·편의점 도시락족에 유리)<br>
-  • <b>세탁 완전 편리 (코인런드리)</b>: 모든 6곳 다 있음 · 5박 여행에 적합<br>
-  • <b>가성비/평점 최고</b>: 사쿠라 호텔 닛포리 (스태프 9.1, 공용 주방·전자레인지)<br>
-  • <b>신축·깨끗함</b>: ICI Hotel Hatchobori (2020년)<br>
-  • <b>긴자 접근성</b>: APA 신토미초 에키마에 키타, APA 하초보리 신토미초, 라이브맥스 신토미초
+  <div class="legend-item"><div class="legend-color" style="background:#f4511e"></div>먹거리</div>
+  <div class="legend-item"><div class="legend-color" style="background:#1e88e5"></div>관광</div>
+  <div class="legend-item"><div class="legend-color" style="background:#8e24aa"></div>쇼핑</div>
+  <div class="legend-item"><div class="legend-color" style="background:#43a047"></div>액티비티</div>
+  <div class="legend-item"><div class="legend-color" style="background:#757575"></div>이동</div>
+  <div class="legend-item"><div class="legend-color" style="background:#bdbdbd"></div>빈 블록</div>
 </div>
+
+<div class="board" id="board">
+  <!-- Day 1 -->
+  <div class="day-column" data-day="1">
+    <div class="day-header">
+      <div class="date">7/18 (토)</div>
+      <div class="day-name">Day 1 · 도착 & 긴자</div>
+    </div>
+    <div class="blocks-container">
+      <div class="block" draggable="true" data-cat="move">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">17:30</span>
+        <div class="block-title" contenteditable="true">✈️ 도쿄 공항 도착</div>
+        <div class="block-desc" contenteditable="true">숙소로 이동 (약 1~1.5시간)</div>
+        <span class="block-cat">이동</span>
+      </div>
+      <div class="block" draggable="true" data-cat="move">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">19:00</span>
+        <div class="block-title" contenteditable="true">🏨 숙소 체크인</div>
+        <div class="block-desc" contenteditable="true">HOTEL LiVEMAX Tokyo Shintomi-cho</div>
+        <span class="block-cat">이동</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">20:00</span>
+        <div class="block-title" contenteditable="true">🍽️ 긴자바이린</div>
+        <div class="block-desc" contenteditable="true">원조 돈카츠 노포 (숙소 도보 10분)</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="sight">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">21:30</span>
+        <div class="block-title" contenteditable="true">🗼 도쿄타워 야경</div>
+        <div class="block-desc" contenteditable="true">지하철 20분, 첫날 기분내기</div>
+        <span class="block-cat">관광</span>
+      </div>
+    </div>
+    <button class="add-block-btn" onclick="addBlock(this)">+ 블록 추가</button>
+  </div>
+
+  <!-- Day 2 -->
+  <div class="day-column" data-day="2">
+    <div class="day-header">
+      <div class="date">7/19 (일)</div>
+      <div class="day-name">Day 2 · 시부야권</div>
+    </div>
+    <div class="blocks-container">
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">09:00</span>
+        <div class="block-title" contenteditable="true">🍣 츠지한 (니혼바시)</div>
+        <div class="block-desc" contenteditable="true">해선동 오픈런 · 숙소 도보 15분</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="sight">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">11:00</span>
+        <div class="block-title" contenteditable="true">🌿 시부야 시부니와</div>
+        <div class="block-desc" contenteditable="true">시부야 옥상정원 산책</div>
+        <span class="block-cat">관광</span>
+      </div>
+      <div class="block" draggable="true" data-cat="shop">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">12:30</span>
+        <div class="block-title" contenteditable="true">🛍️ 시부야 히카리에</div>
+        <div class="block-desc" contenteditable="true">쇼핑 & 구경</div>
+        <span class="block-cat">쇼핑</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">13:30</span>
+        <div class="block-title" contenteditable="true">🥩 효탄야 6초메</div>
+        <div class="block-desc" contenteditable="true">점심 (야키니쿠)</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="sight">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">15:00</span>
+        <div class="block-title" contenteditable="true">☕ 시모키타자와</div>
+        <div class="block-desc" contenteditable="true">빈티지샵, 카페 골목 산책</div>
+        <span class="block-cat">관광</span>
+      </div>
+      <div class="block" draggable="true" data-cat="sight">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">18:00</span>
+        <div class="block-title" contenteditable="true">🌆 스크램블스퀘어 12F (무료)</div>
+        <div class="block-desc" contenteditable="true">무료 전망 플로어에서 일몰 감상</div>
+        <span class="block-cat">관광</span>
+      </div>
+      <div class="block" draggable="true" data-cat="sight">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">19:30</span>
+        <div class="block-title" contenteditable="true">✨ 시부야 스카이 (유료·선택)</div>
+        <div class="block-desc" contenteditable="true">옥상 전망대 · 사전예약 필수</div>
+        <span class="block-cat">관광</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">21:00</span>
+        <div class="block-title" contenteditable="true">🥞 오코노미야키</div>
+        <div class="block-desc" contenteditable="true">시부야 일대 저녁</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+    </div>
+    <button class="add-block-btn" onclick="addBlock(this)">+ 블록 추가</button>
+  </div>
+
+  <!-- Day 3 -->
+  <div class="day-column" data-day="3">
+    <div class="day-header">
+      <div class="date">7/20 (월)</div>
+      <div class="day-name">Day 3 · 후지산</div>
+    </div>
+    <div class="blocks-container">
+      <div class="block" draggable="true" data-cat="move">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">07:30</span>
+        <div class="block-title" contenteditable="true">🚌 신주쿠 → 후지큐</div>
+        <div class="block-desc" contenteditable="true">바스타 신주쿠 고속버스 (약 1h40m)</div>
+        <span class="block-cat">이동</span>
+      </div>
+      <div class="block" draggable="true" data-cat="play">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">10:00</span>
+        <div class="block-title" contenteditable="true">🎢 후지큐 하이랜드</div>
+        <div class="block-desc" contenteditable="true">에바 라이드, 후지야마 + 후지산 뷰</div>
+        <span class="block-cat">액티비티</span>
+      </div>
+      <div class="block" draggable="true" data-cat="move">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">18:00</span>
+        <div class="block-title" contenteditable="true">🚌 후지큐 → 신주쿠</div>
+        <div class="block-desc" contenteditable="true">복귀 버스</div>
+        <span class="block-cat">이동</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">20:00</span>
+        <div class="block-title" contenteditable="true">🍢 오모이데요코초</div>
+        <div class="block-desc" contenteditable="true">신주쿠 꼬치구이 골목 · 레트로 감성</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+    </div>
+    <button class="add-block-btn" onclick="addBlock(this)">+ 블록 추가</button>
+  </div>
+
+  <!-- Day 4 -->
+  <div class="day-column" data-day="4">
+    <div class="day-header">
+      <div class="date">7/21 (화)</div>
+      <div class="day-name">Day 4 · 디즈니씨</div>
+    </div>
+    <div class="blocks-container">
+      <div class="block" draggable="true" data-cat="move">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">07:30</span>
+        <div class="block-title" contenteditable="true">🚇 마이하마역 이동</div>
+        <div class="block-desc" contenteditable="true">유라쿠초선 → JR (약 30분)</div>
+        <span class="block-cat">이동</span>
+      </div>
+      <div class="block" draggable="true" data-cat="play">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">09:00</span>
+        <div class="block-title" contenteditable="true">🏰 도쿄 디즈니씨</div>
+        <div class="block-desc" contenteditable="true">개장~폐장까지 풀타임<br>프리미어 액세스 앱 세팅</div>
+        <span class="block-cat">액티비티</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">18:00</span>
+        <div class="block-title" contenteditable="true">🍽️ 파크 내 저녁</div>
+        <div class="block-desc" contenteditable="true">불꽃/야경까지 관람</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="move">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">22:00</span>
+        <div class="block-title" contenteditable="true">🏨 숙소 복귀</div>
+        <div class="block-desc" contenteditable="true">휴식</div>
+        <span class="block-cat">이동</span>
+      </div>
+    </div>
+    <button class="add-block-btn" onclick="addBlock(this)">+ 블록 추가</button>
+  </div>
+
+  <!-- Day 5 -->
+  <div class="day-column" data-day="5">
+    <div class="day-header">
+      <div class="date">7/22 (수)</div>
+      <div class="day-name">Day 5 · 아키하바라</div>
+    </div>
+    <div class="blocks-container">
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">09:00</span>
+        <div class="block-title" contenteditable="true">🍜 긴자 하치고</div>
+        <div class="block-desc" contenteditable="true">미쉐린 라멘 오픈런</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="shop">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">11:00</span>
+        <div class="block-title" contenteditable="true">🎮 아키하바라</div>
+        <div class="block-desc" contenteditable="true">전자상가, 애니메이션, 굿즈샵</div>
+        <span class="block-cat">쇼핑</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">14:00</span>
+        <div class="block-title" contenteditable="true">☕ 킷사에루</div>
+        <div class="block-desc" contenteditable="true">체인소맨 성지순례 카페</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="sight">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">16:00</span>
+        <div class="block-title" contenteditable="true">🏙️ 아자부다이힐스</div>
+        <div class="block-desc" contenteditable="true">카페 타임 & 모리 JP 타워</div>
+        <span class="block-cat">관광</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">19:00</span>
+        <div class="block-title" contenteditable="true">🍣 긴자스시 마루이</div>
+        <div class="block-desc" contenteditable="true">저녁 (or 돈카츠 스즈키)</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="shop">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">21:00</span>
+        <div class="block-title" contenteditable="true">🛍️ 긴자 산책</div>
+        <div class="block-desc" contenteditable="true">쇼핑 & 야경</div>
+        <span class="block-cat">쇼핑</span>
+      </div>
+    </div>
+    <button class="add-block-btn" onclick="addBlock(this)">+ 블록 추가</button>
+  </div>
+
+  <!-- Day 6 -->
+  <div class="day-column" data-day="6">
+    <div class="day-header">
+      <div class="date">7/23 (목)</div>
+      <div class="day-name">Day 6 · 귀국</div>
+    </div>
+    <div class="blocks-container">
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">08:00</span>
+        <div class="block-title" contenteditable="true">🐟 츠키지 시장</div>
+        <div class="block-desc" contenteditable="true">숙소 도보 10분 · 스시/해선동</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="shop">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">10:30</span>
+        <div class="block-title" contenteditable="true">🛍️ 긴자 마지막 쇼핑</div>
+        <div class="block-desc" contenteditable="true">돈키호테, 유니클로, 무인양품</div>
+        <span class="block-cat">쇼핑</span>
+      </div>
+      <div class="block" draggable="true" data-cat="food">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">12:30</span>
+        <div class="block-title" contenteditable="true">🍱 마지막 점심</div>
+        <div class="block-desc" contenteditable="true">돈카츠 스즈키 or 레어 텐동 미츠요시</div>
+        <span class="block-cat">먹거리</span>
+      </div>
+      <div class="block" draggable="true" data-cat="move">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">15:00</span>
+        <div class="block-title" contenteditable="true">🚅 공항 이동</div>
+        <div class="block-desc" contenteditable="true">체크아웃 & 공항으로</div>
+        <span class="block-cat">이동</span>
+      </div>
+      <div class="block" draggable="true" data-cat="move">
+        <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+        <span class="block-time" contenteditable="true">18:00</span>
+        <div class="block-title" contenteditable="true">✈️ 도쿄 출발</div>
+        <div class="block-desc" contenteditable="true">귀국</div>
+        <span class="block-cat">이동</span>
+      </div>
+    </div>
+    <button class="add-block-btn" onclick="addBlock(this)">+ 블록 추가</button>
+  </div>
+</div>
+
+<script>
+  let draggedItem = null;
+
+  function initDragAndDrop() {
+    document.querySelectorAll('.block').forEach(block => {
+      attachBlockListeners(block);
+    });
+    document.querySelectorAll('.blocks-container').forEach(container => {
+      container.addEventListener('dragover', e => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(container, e.clientY);
+        if (draggedItem) {
+          if (afterElement == null) {
+            container.appendChild(draggedItem);
+          } else {
+            container.insertBefore(draggedItem, afterElement);
+          }
+        }
+      });
+    });
+  }
+
+  function attachBlockListeners(block) {
+    block.addEventListener('dragstart', e => {
+      draggedItem = block;
+      setTimeout(() => block.classList.add('dragging'), 0);
+    });
+    block.addEventListener('dragend', e => {
+      block.classList.remove('dragging');
+      draggedItem = null;
+    });
+    // 편집 가능 영역 클릭 시 드래그 방지
+    block.querySelectorAll('[contenteditable]').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        block.setAttribute('draggable', 'false');
+      });
+      el.addEventListener('blur', e => {
+        block.setAttribute('draggable', 'true');
+      });
+    });
+  }
+
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.block:not(.dragging)')];
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  function addBlock(btn) {
+    const container = btn.previousElementSibling;
+    const categories = ['empty', 'food', 'sight', 'shop', 'play', 'move'];
+    const catNames = { empty:'빈 블록', food:'먹거리', sight:'관광', shop:'쇼핑', play:'액티비티', move:'이동' };
+    const cat = 'empty';
+    const block = document.createElement('div');
+    block.className = 'block';
+    block.setAttribute('draggable', 'true');
+    block.setAttribute('data-cat', cat);
+    block.innerHTML = `
+      <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+      <span class="block-time" contenteditable="true">00:00</span>
+      <div class="block-title" contenteditable="true">새 일정</div>
+      <div class="block-desc" contenteditable="true">클릭해서 내용 입력 · 카테고리 변경은 아래 클릭</div>
+      <span class="block-cat" onclick="changeCat(this)" style="cursor:pointer">${catNames[cat]} (클릭하여 변경)</span>
+    `;
+    container.appendChild(block);
+    attachBlockListeners(block);
+  }
+
+  function changeCat(el) {
+    const block = el.closest('.block');
+    const cats = ['empty', 'food', 'sight', 'shop', 'play', 'move'];
+    const catNames = { empty:'빈 블록', food:'먹거리', sight:'관광', shop:'쇼핑', play:'액티비티', move:'이동' };
+    const currentCat = block.getAttribute('data-cat');
+    const nextIdx = (cats.indexOf(currentCat) + 1) % cats.length;
+    const nextCat = cats[nextIdx];
+    block.setAttribute('data-cat', nextCat);
+    el.textContent = catNames[nextCat] + ' (클릭하여 변경)';
+  }
+
+  function deleteBlock(btn) {
+    if (confirm('이 블록을 삭제할까요?')) {
+      btn.closest('.block').remove();
+    }
+  }
+
+  function savePlan() {
+    const data = {};
+    document.querySelectorAll('.day-column').forEach(col => {
+      const day = col.getAttribute('data-day');
+      const blocks = [];
+      col.querySelectorAll('.block').forEach(b => {
+        blocks.push({
+          cat: b.getAttribute('data-cat'),
+          time: b.querySelector('.block-time').innerText,
+          title: b.querySelector('.block-title').innerText,
+          desc: b.querySelector('.block-desc').innerText
+        });
+      });
+      data[day] = blocks;
+    });
+    localStorage.setItem('tokyoPlan', JSON.stringify(data));
+    alert('✅ 계획이 저장되었습니다!');
+  }
+
+  function loadPlan() {
+    const saved = localStorage.getItem('tokyoPlan');
+    if (!saved) { alert('저장된 계획이 없습니다.'); return; }
+    const data = JSON.parse(saved);
+    const catNames = { empty:'빈 블록', food:'먹거리', sight:'관광', shop:'쇼핑', play:'액티비티', move:'이동' };
+    document.querySelectorAll('.day-column').forEach(col => {
+      const day = col.getAttribute('data-day');
+      const container = col.querySelector('.blocks-container');
+      container.innerHTML = '';
+      (data[day] || []).forEach(item => {
+        const block = document.createElement('div');
+        block.className = 'block';
+        block.setAttribute('draggable', 'true');
+        block.setAttribute('data-cat', item.cat);
+        block.innerHTML = `
+          <button class="delete-btn" onclick="deleteBlock(this)">×</button>
+          <span class="block-time" contenteditable="true">${item.time}</span>
+          <div class="block-title" contenteditable="true">${item.title}</div>
+          <div class="block-desc" contenteditable="true">${item.desc}</div>
+          <span class="block-cat" onclick="changeCat(this)" style="cursor:pointer">${catNames[item.cat]}</span>
+        `;
+        container.appendChild(block);
+        attachBlockListeners(block);
+      });
+    });
+    alert('📂 불러오기 완료!');
+  }
+
+  function resetPlan() {
+    if (confirm('정말 초기 상태로 되돌릴까요? (저장된 데이터는 유지됩니다)')) {
+      location.reload();
+    }
+  }
+
+  initDragAndDrop();
+</script>
 
 </body>
 </html>
