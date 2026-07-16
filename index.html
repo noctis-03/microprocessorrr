@@ -48,7 +48,6 @@
   .pool-header h2 { color: #e65100; font-size: 16px; }
   .pool-hint { font-size: 11px; color: #888; }
 
-  /* 보관함의 행(row) */
   .pool-rows { display: flex; flex-direction: column; gap: 10px; }
   .pool-row {
     display: grid;
@@ -103,7 +102,6 @@
   .row-btn.del { border-color: #e53935; color: #e53935; }
   .row-btn:hover { filter: brightness(0.95); }
 
-  /* 보관함 블록은 작게 */
   .pool-row .block {
     width: 160px;
     margin-bottom: 0;
@@ -321,6 +319,108 @@
   .modal-close:hover { background: rgba(255,255,255,0.4); }
   #big-map { flex: 1; width: 100%; }
 
+  /* ===== 위치 선택 모달 ===== */
+  .loc-modal-content {
+    background: white;
+    border-radius: 15px;
+    width: 100%;
+    max-width: 900px;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .loc-search-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+  }
+  .loc-search-bar input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+  }
+  .loc-search-bar input:focus { border-color: #1a237e; }
+  .loc-search-bar button {
+    padding: 10px 20px;
+    background: #1a237e;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  .loc-search-bar button:hover { background: #3949ab; }
+  .loc-results {
+    max-height: 200px;
+    overflow-y: auto;
+    background: white;
+    border-bottom: 1px solid #ddd;
+  }
+  .loc-result-item {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .loc-result-item:hover { background: #e3f2fd; }
+  .loc-result-item .r-title { font-weight: bold; color: #1a237e; }
+  .loc-result-item .r-addr { font-size: 11px; color: #666; margin-top: 2px; }
+  .loc-hint {
+    padding: 8px 15px;
+    background: #fff3e0;
+    font-size: 12px;
+    color: #e65100;
+    text-align: center;
+    border-bottom: 1px solid #ffcc80;
+  }
+  #loc-map { flex: 1; width: 100%; }
+  .loc-footer {
+    padding: 10px 15px;
+    background: #f5f5f5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .loc-current { font-size: 12px; color: #555; }
+  .loc-current b { color: #1a237e; }
+  .loc-footer-btns { display: flex; gap: 8px; }
+  .loc-footer-btns button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 13px;
+  }
+  .loc-btn-confirm { background: #43a047; color: white; }
+  .loc-btn-clear { background: #e53935; color: white; }
+  .loc-btn-cancel { background: #757575; color: white; }
+  .loc-picker-marker {
+    background: #ff4081;
+    color: white;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    width: 32px; height: 32px;
+    text-align: center;
+    line-height: 32px;
+    border: 3px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    font-size: 16px;
+  }
+  .loc-picker-marker span {
+    display: inline-block;
+    transform: rotate(45deg);
+  }
+
   @media (max-width: 1200px) {
     .board { grid-template-columns: repeat(3, 1fr); }
   }
@@ -361,7 +461,6 @@
     <div class="pool-hint">💡 행 제목 클릭하여 편집 · 블록을 행 사이에서도 이동 가능</div>
   </div>
   <div class="pool-rows" id="pool-rows">
-    <!-- 예시 행 1 -->
     <div class="pool-row">
       <div class="row-title" contenteditable="true">🍜 먹거리 후보</div>
       <div class="row-items blocks-container" data-pool="true">
@@ -387,7 +486,6 @@
         <button class="row-btn del" onclick="deletePoolRow(this)">행 삭제</button>
       </div>
     </div>
-    <!-- 예시 행 2 -->
     <div class="pool-row">
       <div class="row-title" contenteditable="true">🎡 관광지 후보</div>
       <div class="row-items blocks-container" data-pool="true">
@@ -405,11 +503,9 @@
         <button class="row-btn del" onclick="deletePoolRow(this)">행 삭제</button>
       </div>
     </div>
-    <!-- 예시 행 3 -->
     <div class="pool-row">
       <div class="row-title" contenteditable="true">🛍️ 쇼핑 후보</div>
-      <div class="row-items blocks-container" data-pool="true">
-      </div>
+      <div class="row-items blocks-container" data-pool="true"></div>
       <div class="row-actions">
         <button class="row-btn add" onclick="addBlockToRow(this)">+ 블록</button>
         <button class="row-btn del" onclick="deletePoolRow(this)">행 삭제</button>
@@ -817,6 +913,31 @@
   </div>
 </div>
 
+<!-- 위치 선택 모달 -->
+<div class="modal-overlay" id="loc-modal" onclick="closeLocModal(event)">
+  <div class="loc-modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>📍 위치 선택</h2>
+      <button class="modal-close" onclick="closeLocModal()">×</button>
+    </div>
+    <div class="loc-search-bar">
+      <input type="text" id="loc-search-input" placeholder="장소명 검색 (예: 도쿄타워, 시부야역, 츠키지시장)" onkeydown="if(event.key==='Enter'){searchLocation();}">
+      <button onclick="searchLocation()">🔍 검색</button>
+    </div>
+    <div class="loc-results" id="loc-results" style="display:none;"></div>
+    <div class="loc-hint">💡 검색하거나, 지도를 클릭해서 위치를 직접 지정하세요 · 마커 드래그로 미세 조정</div>
+    <div id="loc-map"></div>
+    <div class="loc-footer">
+      <div class="loc-current" id="loc-current">선택된 위치: <b>없음</b></div>
+      <div class="loc-footer-btns">
+        <button class="loc-btn-clear" onclick="clearLocSelection()">위치 삭제</button>
+        <button class="loc-btn-cancel" onclick="closeLocModal()">취소</button>
+        <button class="loc-btn-confirm" onclick="confirmLocation()">✓ 확인</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   let draggedItem = null;
   const catNames = { empty:'빈 블록', food:'먹거리', sight:'관광', shop:'쇼핑', play:'액티비티', move:'이동', hotel:'숙소' };
@@ -933,7 +1054,6 @@
     drawMapContent(day, map, layer);
   }
 
-  // 보관함(pool) 블록들의 위치 버튼 상태 업데이트
   function updatePoolBlocks() {
     document.querySelectorAll('.pool-row .block').forEach(b => {
       const lat = b.getAttribute('data-lat');
@@ -942,13 +1062,12 @@
       if (btn) {
         if (!lat || !lng || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) {
           btn.classList.add('no-loc');
-          btn.textContent = '⚠️ 위치 없음 (클릭하여 설정)';
+          btn.textContent = '⚠️ 위치 없음';
         } else {
           btn.classList.remove('no-loc');
           btn.textContent = '📍 위치 변경';
         }
       }
-      // 보관함에서는 번호 뱃지 제거
       const badge = b.querySelector('.marker-num');
       if (badge) badge.remove();
     });
@@ -1018,17 +1137,14 @@
     });
   }
 
-  // 세로형(계획표) vs 가로형(보관함) 판단하여 위치 계산
   function getDragAfterElement(container, y, x, isHorizontal) {
     const draggableElements = [...container.querySelectorAll('.block:not(.dragging)')];
     return draggableElements.reduce((closest, child) => {
       const box = child.getBoundingClientRect();
       let offset;
       if (isHorizontal) {
-        // 가로 배치: X 기준
         offset = x - box.left - box.width / 2;
       } else {
-        // 세로 배치: Y 기준
         offset = y - box.top - box.height / 2;
       }
       if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
@@ -1042,7 +1158,6 @@
   }
 
   function addBlockToRow(btn) {
-    // btn -> row-actions -> row-items 형제 찾기
     const row = btn.closest('.pool-row');
     const container = row.querySelector('.row-items');
     createNewBlock(container);
@@ -1060,38 +1175,145 @@
       <div class="block-title" contenteditable="true">새 일정</div>
       <div class="block-desc" contenteditable="true">설명</div>
       <span class="block-cat" onclick="changeCat(this)">${catNames[cat]}</span>
-      <button class="block-loc-btn no-loc" onclick="setLocation(this)">⚠️ 위치 없음 (클릭하여 설정)</button>
+      <button class="block-loc-btn no-loc" onclick="setLocation(this)">⚠️ 위치 없음</button>
     `;
     container.appendChild(block);
     attachBlockListeners(block);
     updateAllMaps();
   }
 
+  // ===== 위치 선택 모달 =====
+  let locMap = null;
+  let locMarker = null;
+  let locTargetBlock = null;
+  let locSelectedLatLng = null;
+
   function setLocation(btn) {
-    const block = btn.closest('.block');
-    const currentLat = block.getAttribute('data-lat');
-    const currentLng = block.getAttribute('data-lng');
-    const currentVal = (currentLat && currentLng) ? `${currentLat},${currentLng}` : '';
-    const input = prompt(
-      '좌표를 입력하세요 (형식: 위도,경도)\n예: 35.6595,139.7005\n\n구글맵에서 장소 우클릭 → 좌표 복사\n(빈칸으로 두고 확인하면 위치 삭제)',
-      currentVal
-    );
-    if (input === null) return; // 취소
-    if (input.trim() === '') {
-      // 위치 삭제
-      block.removeAttribute('data-lat');
-      block.removeAttribute('data-lng');
-      updateAllMaps();
-      return;
+    locTargetBlock = btn.closest('.block');
+    const lat = parseFloat(locTargetBlock.getAttribute('data-lat'));
+    const lng = parseFloat(locTargetBlock.getAttribute('data-lng'));
+    const title = locTargetBlock.querySelector('.block-title').innerText;
+
+    document.getElementById('loc-modal').classList.add('active');
+    document.getElementById('loc-search-input').value = title || '';
+    document.getElementById('loc-results').style.display = 'none';
+    document.getElementById('loc-results').innerHTML = '';
+
+    setTimeout(() => {
+      if (!locMap) {
+        locMap = L.map('loc-map', { scrollWheelZoom: true }).setView([35.68, 139.75], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OSM', maxZoom: 19
+        }).addTo(locMap);
+        locMap.on('click', (e) => {
+          placeLocMarker(e.latlng.lat, e.latlng.lng);
+        });
+      } else {
+        locMap.invalidateSize();
+      }
+
+      if (!isNaN(lat) && !isNaN(lng)) {
+        placeLocMarker(lat, lng);
+        locMap.setView([lat, lng], 15);
+      } else {
+        if (locMarker) { locMap.removeLayer(locMarker); locMarker = null; }
+        locSelectedLatLng = null;
+        updateLocCurrentText();
+        locMap.setView([35.68, 139.75], 12);
+      }
+    }, 100);
+  }
+
+  function placeLocMarker(lat, lng) {
+    if (locMarker) locMap.removeLayer(locMarker);
+    const icon = L.divIcon({
+      className: '',
+      html: '<div class="loc-picker-marker"><span>📍</span></div>',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32]
+    });
+    locMarker = L.marker([lat, lng], { icon: icon, draggable: true }).addTo(locMap);
+    locMarker.on('dragend', (e) => {
+      const p = e.target.getLatLng();
+      locSelectedLatLng = { lat: p.lat, lng: p.lng };
+      updateLocCurrentText();
+    });
+    locSelectedLatLng = { lat: lat, lng: lng };
+    updateLocCurrentText();
+  }
+
+  function updateLocCurrentText() {
+    const el = document.getElementById('loc-current');
+    if (locSelectedLatLng) {
+      el.innerHTML = `선택된 위치: <b>${locSelectedLatLng.lat.toFixed(5)}, ${locSelectedLatLng.lng.toFixed(5)}</b>`;
+    } else {
+      el.innerHTML = '선택된 위치: <b>없음</b>';
     }
-    const parts = input.split(',').map(s => s.trim());
-    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
-      alert('올바른 형식이 아닙니다. 예: 35.6595,139.7005');
-      return;
+  }
+
+  async function searchLocation() {
+    const query = document.getElementById('loc-search-input').value.trim();
+    if (!query) return;
+    const resultsEl = document.getElementById('loc-results');
+    resultsEl.style.display = 'block';
+    resultsEl.innerHTML = '<div class="loc-result-item">🔍 검색 중...</div>';
+
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&accept-language=ko,ja,en`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const data = await res.json();
+
+      if (!data || data.length === 0) {
+        resultsEl.innerHTML = '<div class="loc-result-item">검색 결과가 없습니다. 다른 키워드로 시도해보세요.</div>';
+        return;
+      }
+
+      resultsEl.innerHTML = '';
+      data.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'loc-result-item';
+        const name = item.display_name.split(',')[0];
+        div.innerHTML = `<div class="r-title">${name}</div><div class="r-addr">${item.display_name}</div>`;
+        div.onclick = () => {
+          const lat = parseFloat(item.lat);
+          const lng = parseFloat(item.lon);
+          placeLocMarker(lat, lng);
+          locMap.setView([lat, lng], 16);
+          resultsEl.style.display = 'none';
+        };
+        resultsEl.appendChild(div);
+      });
+    } catch (err) {
+      resultsEl.innerHTML = '<div class="loc-result-item">검색 오류가 발생했습니다. 지도를 클릭해서 직접 선택해주세요.</div>';
     }
-    block.setAttribute('data-lat', parts[0]);
-    block.setAttribute('data-lng', parts[1]);
+  }
+
+  function confirmLocation() {
+    if (!locTargetBlock) return;
+    if (locSelectedLatLng) {
+      locTargetBlock.setAttribute('data-lat', locSelectedLatLng.lat.toFixed(6));
+      locTargetBlock.setAttribute('data-lng', locSelectedLatLng.lng.toFixed(6));
+    }
+    closeLocModal();
     updateAllMaps();
+  }
+
+  function clearLocSelection() {
+    if (!locTargetBlock) return;
+    if (confirm('이 블록의 위치를 삭제할까요?')) {
+      locTargetBlock.removeAttribute('data-lat');
+      locTargetBlock.removeAttribute('data-lng');
+      if (locMarker) { locMap.removeLayer(locMarker); locMarker = null; }
+      locSelectedLatLng = null;
+      closeLocModal();
+      updateAllMaps();
+    }
+  }
+
+  function closeLocModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('loc-modal').classList.remove('active');
+    locTargetBlock = null;
   }
 
   function changeCat(el) {
@@ -1199,14 +1421,12 @@
   function loadPlan() {
     let saved = localStorage.getItem('tokyoPlan_v2');
     if (!saved) {
-      // 구버전 호환
       const old = localStorage.getItem('tokyoPlan');
       if (old) saved = JSON.stringify({ days: JSON.parse(old), pool: [] });
     }
     if (!saved) { alert('저장된 계획이 없습니다.'); return; }
     const data = JSON.parse(saved);
 
-    // 일정 복원
     const daysData = data.days || data;
     document.querySelectorAll('.day-column').forEach(col => {
       const day = col.getAttribute('data-day');
@@ -1220,7 +1440,6 @@
       (blocks || []).forEach(item => container.appendChild(buildBlockElement(item)));
     });
 
-    // 보관함 복원
     if (data.pool && Array.isArray(data.pool)) {
       const poolRows = document.getElementById('pool-rows');
       poolRows.innerHTML = '';
