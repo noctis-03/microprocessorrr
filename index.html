@@ -27,6 +27,8 @@
   .btn:hover { background: #3949ab; transform: translateY(-2px); }
   .btn.save { background: #43a047; }
   .btn.load { background: #fb8c00; }
+  .btn.export { background: #6a1b9a; }
+  .btn.import { background: #0277bd; }
   .btn.reset { background: #e53935; }
   .btn.add-row { background: #00838f; }
 
@@ -437,8 +439,11 @@
 <div class="subtitle">7/18(토) ~ 7/23(목) · 5박 6일 · 숙소: HOTEL LiVEMAX Tokyo Shintomi-cho</div>
 
 <div class="toolbar">
-  <button class="btn save" onclick="savePlan()">💾 저장</button>
-  <button class="btn load" onclick="loadPlan()">📂 불러오기</button>
+  <button class="btn save" onclick="savePlan()">💾 브라우저 저장</button>
+  <button class="btn load" onclick="loadPlan()">📂 브라우저 불러오기</button>
+  <button class="btn export" onclick="exportToFile()">⬇️ 파일로 저장</button>
+  <button class="btn import" onclick="document.getElementById('import-file').click()">⬆️ 파일 불러오기</button>
+  <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importFromFile(event)">
   <button class="btn add-row" onclick="addPoolRow()">➕ 보관함 행 추가</button>
   <button class="btn reset" onclick="resetPlan()">🔄 초기화</button>
   <button class="btn" onclick="window.print()">🖨️ 인쇄</button>
@@ -1362,7 +1367,7 @@
     }
   }
 
-  // ===== 저장 / 불러오기 =====
+  // ===== 데이터 직렬화/복원 공통 =====
   function serializeBlock(b) {
     return {
       cat: b.getAttribute('data-cat'),
@@ -1372,30 +1377,6 @@
       title: b.querySelector('.block-title').innerText,
       desc: b.querySelector('.block-desc').innerText
     };
-  }
-
-  function savePlan() {
-    const data = { days: {}, pool: [] };
-    document.querySelectorAll('.day-column').forEach(col => {
-      const day = col.getAttribute('data-day');
-      const blocks = [];
-      col.querySelectorAll('.block').forEach(b => blocks.push(serializeBlock(b)));
-      data.days[day] = {
-        date: col.querySelector('.date').innerText,
-        dayName: col.querySelector('.day-name').innerText,
-        blocks: blocks
-      };
-    });
-    document.querySelectorAll('.pool-row').forEach(row => {
-      const rowData = {
-        title: row.querySelector('.row-title').innerText,
-        blocks: []
-      };
-      row.querySelectorAll('.block').forEach(b => rowData.blocks.push(serializeBlock(b)));
-      data.pool.push(rowData);
-    });
-    localStorage.setItem('tokyoPlan_v2', JSON.stringify(data));
-    alert('✅ 계획이 저장되었습니다!');
   }
 
   function buildBlockElement(item) {
@@ -1418,15 +1399,28 @@
     return block;
   }
 
-  function loadPlan() {
-    let saved = localStorage.getItem('tokyoPlan_v2');
-    if (!saved) {
-      const old = localStorage.getItem('tokyoPlan');
-      if (old) saved = JSON.stringify({ days: JSON.parse(old), pool: [] });
-    }
-    if (!saved) { alert('저장된 계획이 없습니다.'); return; }
-    const data = JSON.parse(saved);
+  function buildPlanData() {
+    const data = { version: 2, exportedAt: new Date().toISOString(), days: {}, pool: [] };
+    document.querySelectorAll('.day-column').forEach(col => {
+      const day = col.getAttribute('data-day');
+      const blocks = [];
+      col.querySelectorAll('.block').forEach(b => blocks.push(serializeBlock(b)));
+      data.days[day] = {
+        date: col.querySelector('.date').innerText,
+        dayName: col.querySelector('.day-name').innerText,
+        blocks: blocks
+      };
+    });
+    document.querySelectorAll('.pool-row').forEach(row => {
+      data.pool.push({
+        title: row.querySelector('.row-title').innerText,
+        blocks: [...row.querySelectorAll('.block')].map(serializeBlock)
+      });
+    });
+    return data;
+  }
 
+  function applyPlanData(data) {
     const daysData = data.days || data;
     document.querySelectorAll('.day-column').forEach(col => {
       const day = col.getAttribute('data-day');
@@ -1460,9 +1454,69 @@
         attachContainerListeners(itemsContainer);
       });
     }
-
     updateAllMaps();
+  }
+
+  // ===== 브라우저 저장/불러오기 =====
+  function savePlan() {
+    const data = buildPlanData();
+    localStorage.setItem('tokyoPlan_v2', JSON.stringify(data));
+    alert('✅ 브라우저에 저장되었습니다!\n(파일로 백업하려면 "⬇️ 파일로 저장" 사용)');
+  }
+
+  function loadPlan() {
+    let saved = localStorage.getItem('tokyoPlan_v2');
+    if (!saved) {
+      const old = localStorage.getItem('tokyoPlan');
+      if (old) saved = JSON.stringify({ days: JSON.parse(old), pool: [] });
+    }
+    if (!saved) { alert('저장된 계획이 없습니다.'); return; }
+    applyPlanData(JSON.parse(saved));
     alert('📂 불러오기 완료!');
+  }
+
+  // ===== 파일로 저장/불러오기 =====
+  function exportToFile() {
+    const data = buildPlanData();
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const now = new Date();
+    const ymd = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0');
+    const filename = `도쿄여행_${ymd}.json`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function importFromFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!confirm('현재 계획을 파일 내용으로 덮어씌울까요?\n(먼저 💾 브라우저 저장을 해두면 안전해요)')) {
+          event.target.value = '';
+          return;
+        }
+        applyPlanData(data);
+        alert('📂 파일에서 불러오기 완료!');
+      } catch (err) {
+        alert('❌ 파일을 읽는 중 오류가 발생했습니다.\n올바른 JSON 파일인지 확인해주세요.\n\n' + err.message);
+      }
+      event.target.value = '';
+    };
+    reader.onerror = () => alert('❌ 파일 읽기 실패');
+    reader.readAsText(file, 'utf-8');
   }
 
   function resetPlan() {
